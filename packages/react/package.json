@@ -1,7 +1,7 @@
 {
   "name": "@lunasmedia/storyrings-react",
-  "version": "0.1.0",
-  "description": "React component for Stories: <StoriesBar token=\"…\" />",
+  "version": "0.1.1",
+  "description": "React component for Stories: <StoriesBar token=\"\u2026\" />",
   "license": "MIT",
   "keywords": [
     "stories",
@@ -38,7 +38,7 @@
     "prepack": "tsup"
   },
   "dependencies": {
-    "@lunasmedia/storyrings-web": "workspace:*"
+    "@lunasmedia/storyrings-web": "workspace:^"
   },
   "peerDependencies": {
     "react": ">=17"

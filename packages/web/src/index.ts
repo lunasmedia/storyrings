@@ -5,5 +5,4 @@ export { type BarPreviewHandle, type BarPreviewOptions, createBarPreview } from 
 export { renderCircle } from './circle.js';
 export { type InitOptions, init, StoriesClient, version } from './client.js';
 export { defineStoriesElement } from './element.js';
-export { type PreviewHandle, type PreviewOptions, previewStories } from './preview.js';
 export type { CtaClickEvent, ShareEvent, StoryOpenEvent } from './viewer.js';

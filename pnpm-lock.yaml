@@ -38,7 +38,7 @@ importers:
   packages/react:
     dependencies:
       '@lunasmedia/storyrings-web':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../web
     devDependencies:
       '@types/react':

@@ -797,7 +797,7 @@ describe('<stories-bar> element', () => {
 
 describe('previewStories', () => {
   it('opens the viewer on draft groups without tracking or navigating', async () => {
-    const { previewStories } = await import('../src/index.js');
+    const { previewStories } = await import('../src/preview-entry.js');
     const onClose = vi.fn();
     const open = vi.spyOn(window, 'open');
     const p = previewStories({
@@ -818,7 +818,7 @@ describe('previewStories', () => {
 
 describe('story names', () => {
   it('shows the story name in the header, falling back to the group title', async () => {
-    const { previewStories } = await import('../src/index.js');
+    const { previewStories } = await import('../src/preview-entry.js');
     const groups = [
       {
         ...feed.groups[0]!,
@@ -854,7 +854,7 @@ describe('embedded preview', () => {
         'clearTimeout',
       ],
     });
-    const { previewStories } = await import('../src/index.js');
+    const { previewStories } = await import('../src/preview-entry.js');
     const frame = document.createElement('div');
     document.body.append(frame);
     const outside = document.createElement('button');

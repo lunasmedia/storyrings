@@ -23,7 +23,7 @@ const script = {
 export default defineConfig([
   // npm package: ESM + CJS + types
   {
-    entry: { index: 'src/index.ts' },
+    entry: { index: 'src/index.ts', preview: 'src/preview-entry.ts' },
     format: ['esm', 'cjs'],
     // Inline only our own workspace types; never third-party ones.
     dts: { resolve: [/^@stories\//] },

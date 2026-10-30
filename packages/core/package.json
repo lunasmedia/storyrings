@@ -1,0 +1,24 @@
+{
+  "name": "@stories/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Framework-free story viewer logic shared by the Stories SDKs",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "spec:update": "UPDATE_SPEC=1 vitest run test/conformance.test.ts"
+  },
+  "dependencies": {
+    "@stories/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

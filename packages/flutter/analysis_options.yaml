@@ -1,0 +1,12 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+  language:
+    strict-casts: false
+
+linter:
+  rules:
+    - prefer_single_quotes
+    - always_declare_return_types

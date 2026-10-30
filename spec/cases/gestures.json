@@ -1,0 +1,116 @@
+{
+  "suite": "gestures",
+  "description": "Turning touches into taps (left/right half decides back/next), holds (pause) and swipes. x/y in points, t in milliseconds.",
+  "cases": [
+    {
+      "name": "a quick tap on the right",
+      "input": {
+        "width": 400,
+        "events": [["down", 300, 200, 0], ["up", 300, 200, 100]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", 0, 0], ["tap", 0.75]]
+      }
+    },
+    {
+      "name": "a quick tap on the left",
+      "input": {
+        "width": 400,
+        "events": [["down", 80, 200, 0], ["up", 80, 200, 100]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", 0, 0], ["tap", 0.2]]
+      }
+    },
+    {
+      "name": "pressing longer than a tap is a hold, then release",
+      "input": {
+        "width": 400,
+        "events": [["down", 200, 200, 0], ["up", 200, 200, 600]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", 0, 0], ["release"]]
+      }
+    },
+    {
+      "name": "a small wobble still counts as a tap",
+      "input": {
+        "width": 400,
+        "events": [["down", 200, 200, 0], ["move", 206, 204], ["up", 206, 204, 120]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", 0, 0], ["tap", 0.515]]
+      }
+    },
+    {
+      "name": "swipe left",
+      "input": {
+        "width": 400,
+        "events": [["down", 300, 200, 0], ["move", 240, 205], ["up", 200, 205, 200]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", -60, 5], ["drag", 0, 0], ["swipe", "left"]]
+      }
+    },
+    {
+      "name": "swipe right",
+      "input": {
+        "width": 400,
+        "events": [["down", 100, 200, 0], ["move", 160, 190], ["up", 180, 190, 200]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", 60, -10], ["drag", 0, 0], ["swipe", "right"]]
+      }
+    },
+    {
+      "name": "swipe down",
+      "input": {
+        "width": 400,
+        "events": [["down", 200, 100, 0], ["move", 205, 160], ["up", 205, 200, 200]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", 5, 60], ["drag", 0, 0], ["swipe", "down"]]
+      }
+    },
+    {
+      "name": "swipe up",
+      "input": {
+        "width": 400,
+        "events": [["down", 200, 300, 0], ["move", 195, 230], ["up", 195, 200, 200]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", -5, -70], ["drag", 0, 0], ["swipe", "up"]]
+      }
+    },
+    {
+      "name": "a drag that's too short is a release",
+      "input": {
+        "width": 400,
+        "events": [["down", 200, 200, 0], ["move", 230, 200], ["up", 230, 200, 200]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", 30, 0], ["drag", 0, 0], ["release"]]
+      }
+    },
+    {
+      "name": "a cancelled touch releases",
+      "input": {
+        "width": 400,
+        "events": [["down", 200, 200, 0], ["cancel"]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", 0, 0], ["release"]]
+      }
+    },
+    {
+      "name": "no width taps in the middle",
+      "input": {
+        "width": 0,
+        "events": [["down", 10, 10, 0], ["up", 10, 10, 50]]
+      },
+      "expect": {
+        "calls": [["press"], ["drag", 0, 0], ["tap", 0.5]]
+      }
+    }
+  ]
+}

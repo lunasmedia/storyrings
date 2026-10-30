@@ -1,0 +1,517 @@
+{
+  "suite": "analytics",
+  "description": "Batching analytics events: the envelope each batch is sent in, batches of maxBatch, retrying failed sends in order, and dropping the oldest when too many are waiting. Timer-based sending (every flushIntervalMs) is left to each SDK.",
+  "cases": [
+    {
+      "name": "a batch carries the sdk, session, viewer and platform, with each event's time",
+      "input": {
+        "options": {
+          "sdk": "flutter@1.0.0",
+          "sessionId": "sess",
+          "viewer": "viewer-1",
+          "platform": "ios",
+          "maxBatch": 50
+        },
+        "steps": [
+          {
+            "track": {
+              "type": "impression",
+              "groupId": "g1"
+            },
+            "at": 1000
+          },
+          {
+            "track": {
+              "type": "app_open"
+            },
+            "at": 1500
+          },
+          {
+            "flush": {}
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "sent": [],
+            "pending": 1
+          },
+          {
+            "sent": [],
+            "pending": 2
+          },
+          {
+            "sent": [
+              {
+                "body": {
+                  "sdk": "flutter@1.0.0",
+                  "sessionId": "sess",
+                  "viewer": "viewer-1",
+                  "platform": "ios",
+                  "events": [
+                    {
+                      "type": "impression",
+                      "groupId": "g1",
+                      "ts": 1000
+                    },
+                    {
+                      "type": "app_open",
+                      "ts": 1500
+                    }
+                  ]
+                },
+                "beacon": false
+              }
+            ],
+            "pending": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "no viewer ID, platform or automation flag means none are sent",
+      "input": {
+        "options": {
+          "sdk": "web@1.0.0",
+          "sessionId": "sess"
+        },
+        "steps": [
+          {
+            "track": {
+              "type": "story_view",
+              "groupId": "g1",
+              "storyId": "s1"
+            },
+            "at": 5
+          },
+          {
+            "flush": {}
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "sent": [],
+            "pending": 1
+          },
+          {
+            "sent": [
+              {
+                "body": {
+                  "sdk": "web@1.0.0",
+                  "sessionId": "sess",
+                  "events": [
+                    {
+                      "type": "story_view",
+                      "groupId": "g1",
+                      "storyId": "s1",
+                      "ts": 5
+                    }
+                  ]
+                },
+                "beacon": false
+              }
+            ],
+            "pending": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "automated browsers are flagged",
+      "input": {
+        "options": {
+          "sdk": "web@1.0.0",
+          "sessionId": "sess",
+          "automation": true,
+          "platform": "desktop"
+        },
+        "steps": [
+          {
+            "track": {
+              "type": "page_view"
+            },
+            "at": 1
+          },
+          {
+            "flush": {}
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "sent": [],
+            "pending": 1
+          },
+          {
+            "sent": [
+              {
+                "body": {
+                  "sdk": "web@1.0.0",
+                  "sessionId": "sess",
+                  "platform": "desktop",
+                  "automation": true,
+                  "events": [
+                    {
+                      "type": "page_view",
+                      "ts": 1
+                    }
+                  ]
+                },
+                "beacon": false
+              }
+            ],
+            "pending": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "a full batch goes out at once",
+      "input": {
+        "options": {
+          "sdk": "ios@1.0.0",
+          "sessionId": "sess",
+          "maxBatch": 2
+        },
+        "steps": [
+          {
+            "track": {
+              "type": "impression",
+              "groupId": "g1"
+            },
+            "at": 1
+          },
+          {
+            "track": {
+              "type": "impression",
+              "groupId": "g2"
+            },
+            "at": 2
+          },
+          {
+            "track": {
+              "type": "impression",
+              "groupId": "g3"
+            },
+            "at": 3
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "sent": [],
+            "pending": 1
+          },
+          {
+            "sent": [
+              {
+                "body": {
+                  "sdk": "ios@1.0.0",
+                  "sessionId": "sess",
+                  "events": [
+                    {
+                      "type": "impression",
+                      "groupId": "g1",
+                      "ts": 1
+                    },
+                    {
+                      "type": "impression",
+                      "groupId": "g2",
+                      "ts": 2
+                    }
+                  ]
+                },
+                "beacon": false
+              }
+            ],
+            "pending": 0
+          },
+          {
+            "sent": [],
+            "pending": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "a failed send is retried on the next flush, in order",
+      "input": {
+        "options": {
+          "sdk": "android@1.0.0",
+          "sessionId": "sess",
+          "maxBatch": 2
+        },
+        "steps": [
+          {
+            "track": {
+              "type": "group_open",
+              "groupId": "g1"
+            },
+            "at": 1
+          },
+          {
+            "flush": {
+              "fail": 1
+            }
+          },
+          {
+            "track": {
+              "type": "tap_forward",
+              "groupId": "g1",
+              "storyId": "s1"
+            },
+            "at": 2
+          },
+          {
+            "flush": {}
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "sent": [],
+            "pending": 1
+          },
+          {
+            "sent": [
+              {
+                "body": {
+                  "sdk": "android@1.0.0",
+                  "sessionId": "sess",
+                  "events": [
+                    {
+                      "type": "group_open",
+                      "groupId": "g1",
+                      "ts": 1
+                    }
+                  ]
+                },
+                "beacon": false
+              }
+            ],
+            "pending": 1
+          },
+          {
+            "sent": [
+              {
+                "body": {
+                  "sdk": "android@1.0.0",
+                  "sessionId": "sess",
+                  "events": [
+                    {
+                      "type": "group_open",
+                      "groupId": "g1",
+                      "ts": 1
+                    },
+                    {
+                      "type": "tap_forward",
+                      "groupId": "g1",
+                      "storyId": "s1",
+                      "ts": 2
+                    }
+                  ]
+                },
+                "beacon": false
+              }
+            ],
+            "pending": 0
+          },
+          {
+            "sent": [],
+            "pending": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "only the newest maxQueue events are kept while sends fail",
+      "input": {
+        "options": {
+          "sdk": "ios@1.0.0",
+          "sessionId": "sess",
+          "maxBatch": 5,
+          "maxQueue": 3
+        },
+        "steps": [
+          {
+            "flush": {}
+          },
+          {
+            "track": {
+              "type": "impression",
+              "groupId": "g1"
+            },
+            "at": 1
+          },
+          {
+            "flush": {
+              "fail": 1
+            }
+          },
+          {
+            "track": {
+              "type": "impression",
+              "groupId": "g2"
+            },
+            "at": 2
+          },
+          {
+            "track": {
+              "type": "impression",
+              "groupId": "g3"
+            },
+            "at": 3
+          },
+          {
+            "track": {
+              "type": "impression",
+              "groupId": "g4"
+            },
+            "at": 4
+          },
+          {
+            "flush": {}
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "sent": [],
+            "pending": 0
+          },
+          {
+            "sent": [],
+            "pending": 1
+          },
+          {
+            "sent": [
+              {
+                "body": {
+                  "sdk": "ios@1.0.0",
+                  "sessionId": "sess",
+                  "events": [
+                    {
+                      "type": "impression",
+                      "groupId": "g1",
+                      "ts": 1
+                    }
+                  ]
+                },
+                "beacon": false
+              }
+            ],
+            "pending": 1
+          },
+          {
+            "sent": [],
+            "pending": 2
+          },
+          {
+            "sent": [],
+            "pending": 3
+          },
+          {
+            "sent": [],
+            "pending": 3
+          },
+          {
+            "sent": [
+              {
+                "body": {
+                  "sdk": "ios@1.0.0",
+                  "sessionId": "sess",
+                  "events": [
+                    {
+                      "type": "impression",
+                      "groupId": "g2",
+                      "ts": 2
+                    },
+                    {
+                      "type": "impression",
+                      "groupId": "g3",
+                      "ts": 3
+                    },
+                    {
+                      "type": "impression",
+                      "groupId": "g4",
+                      "ts": 4
+                    }
+                  ]
+                },
+                "beacon": false
+              }
+            ],
+            "pending": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "a send while the app is going away isn't retried",
+      "input": {
+        "options": {
+          "sdk": "android@1.0.0",
+          "sessionId": "sess"
+        },
+        "steps": [
+          {
+            "track": {
+              "type": "exit",
+              "groupId": "g1",
+              "storyId": "s1"
+            },
+            "at": 9
+          },
+          {
+            "flush": {
+              "beacon": true,
+              "fail": 1
+            }
+          },
+          {
+            "flush": {}
+          }
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "sent": [],
+            "pending": 1
+          },
+          {
+            "sent": [
+              {
+                "body": {
+                  "sdk": "android@1.0.0",
+                  "sessionId": "sess",
+                  "events": [
+                    {
+                      "type": "exit",
+                      "groupId": "g1",
+                      "storyId": "s1",
+                      "ts": 9
+                    }
+                  ]
+                },
+                "beacon": true
+              }
+            ],
+            "pending": 0
+          },
+          {
+            "sent": [],
+            "pending": 0
+          }
+        ]
+      }
+    }
+  ]
+}

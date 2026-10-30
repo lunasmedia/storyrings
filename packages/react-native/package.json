@@ -1,0 +1,60 @@
+{
+  "name": "@lunasmedia/storyrings-react-native",
+  "version": "0.1.0",
+  "description": "Instagram-style stories for React Native apps",
+  "license": "MIT",
+  "keywords": [
+    "stories",
+    "react-native",
+    "expo"
+  ],
+  "homepage": "https://github.com/lunasmedia/storyrings#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lunasmedia/storyrings.git",
+    "directory": "packages/react-native"
+  },
+  "bugs": "https://github.com/lunasmedia/storyrings/issues",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prepack": "tsup"
+  },
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": ">=1.17",
+    "react": ">=18",
+    "react-native": ">=0.79",
+    "react-native-video": ">=6"
+  },
+  "peerDependenciesMeta": {
+    "@react-native-async-storage/async-storage": {
+      "optional": true
+    },
+    "react-native-video": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@stories/contracts": "workspace:*",
+    "@stories/core": "workspace:0.1.0",
+    "vitest": "^3.2.4",
+    "@types/react": "~19.2.0",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "tsup": "^8.5.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ]
+}

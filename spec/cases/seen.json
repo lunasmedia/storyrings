@@ -1,0 +1,54 @@
+{
+  "suite": "seen",
+  "description": "Which stories this device has seen: rings turn grey when every story in a group is seen; the viewer starts at the first unseen story. The oldest of more than 1000 ids are forgotten.",
+  "cases": [
+    {
+      "name": "a group is seen only when all its stories are",
+      "input": {
+        "ops": [
+          ["markSeen", "a1"],
+          ["isGroupSeen", ["a1", "a2"]],
+          ["markSeen", "a2"],
+          ["isGroupSeen", ["a1", "a2"]],
+          ["isGroupSeen", []]
+        ]
+      },
+      "expect": {
+        "results": [null, false, null, true, false]
+      }
+    },
+    {
+      "name": "adding a story makes a seen group active again",
+      "input": {
+        "ops": [["markSeen", "a1"], ["isGroupSeen", ["a1"]], ["isGroupSeen", ["a1", "a2"]]]
+      },
+      "expect": {
+        "results": [null, true, false]
+      }
+    },
+    {
+      "name": "the viewer starts at the first unseen story, or replays a seen group",
+      "input": {
+        "ops": [
+          ["markSeen", "a1"],
+          ["firstUnseenIndex", ["a1", "a2", "a3"]],
+          ["markSeen", "a2"],
+          ["markSeen", "a3"],
+          ["firstUnseenIndex", ["a1", "a2", "a3"]]
+        ]
+      },
+      "expect": {
+        "results": [null, 1, null, null, 0]
+      }
+    },
+    {
+      "name": "only the newest 1000 ids are kept",
+      "input": {
+        "ops": [["markMany", "x", 1001], ["has", "x0"], ["has", "x1"], ["has", "x1000"]]
+      },
+      "expect": {
+        "results": [null, false, true, true]
+      }
+    }
+  ]
+}

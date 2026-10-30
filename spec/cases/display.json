@@ -1,0 +1,145 @@
+{
+  "suite": "display",
+  "description": "How a story fits the screen: covering it (fill) or shown whole with coloured gaps (fit), and the overlay drawn over a designed video.",
+  "cases": [
+    {
+      "name": "a story that fills the screen has no gap colours",
+      "input": {
+        "story": {
+          "fit": "fill",
+          "fill": {
+            "top": "#112233",
+            "bottom": "#445566"
+          }
+        }
+      },
+      "expect": {
+        "fit": "fill",
+        "fill": null,
+        "overlay": null
+      }
+    },
+    {
+      "name": "a story shown whole keeps its gap colours",
+      "input": {
+        "story": {
+          "fit": "fit",
+          "fill": {
+            "top": "#112233",
+            "bottom": "#445566"
+          }
+        }
+      },
+      "expect": {
+        "fit": "fit",
+        "fill": {
+          "top": "#112233",
+          "bottom": "#445566"
+        },
+        "overlay": null
+      }
+    },
+    {
+      "name": "gap colours that aren't #rrggbb mean black",
+      "input": {
+        "story": {
+          "fit": "fit",
+          "fill": {
+            "top": "red",
+            "bottom": "#445566"
+          }
+        }
+      },
+      "expect": {
+        "fit": "fit",
+        "fill": null,
+        "overlay": null
+      }
+    },
+    {
+      "name": "older servers send neither: shown whole, black gaps",
+      "input": {
+        "story": {}
+      },
+      "expect": {
+        "fit": "fit",
+        "fill": null,
+        "overlay": null
+      }
+    },
+    {
+      "name": "an unknown fit is shown whole",
+      "input": {
+        "story": {
+          "fit": "stretch",
+          "fill": null
+        }
+      },
+      "expect": {
+        "fit": "fit",
+        "fill": null,
+        "overlay": null
+      }
+    },
+    {
+      "name": "a video designed in the studio has its overlay drawn over it",
+      "input": {
+        "story": {
+          "type": "video",
+          "fit": "fill",
+          "overlay": "https://cdn.example.com/overlay.png"
+        }
+      },
+      "expect": {
+        "fit": "fill",
+        "fill": null,
+        "overlay": "https://cdn.example.com/overlay.png"
+      }
+    },
+    {
+      "name": "only videos have an overlay (a designed photo has its text in the image)",
+      "input": {
+        "story": {
+          "type": "image",
+          "fit": "fill",
+          "overlay": "https://cdn.example.com/overlay.png"
+        }
+      },
+      "expect": {
+        "fit": "fill",
+        "fill": null,
+        "overlay": null
+      }
+    },
+    {
+      "name": "an overlay that isn't a web address is ignored",
+      "input": {
+        "story": {
+          "type": "video",
+          "fit": "fit",
+          "overlay": "javascript:alert(1)"
+        }
+      },
+      "expect": {
+        "fit": "fit",
+        "fill": null,
+        "overlay": null
+      }
+    },
+    {
+      "name": "an overlay that isn't text is ignored",
+      "input": {
+        "story": {
+          "type": "video",
+          "fit": "fill",
+          "overlay": 42
+        }
+      },
+      "expect": {
+        "fit": "fill",
+        "fill": null,
+        "overlay": null
+      }
+    }
+  ]
+}

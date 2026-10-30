@@ -1,0 +1,297 @@
+{
+  "suite": "links",
+  "description": "Share links: websites put the story in the page URL fragment; mobile apps fill in their share link. Story buttons open https/http links, or a mobile app's own deep-link schemes.",
+  "cases": [
+    {
+      "name": "web: a story link on a page",
+      "input": {
+        "op": "shareUrl",
+        "pageUrl": "https://news.example.com/article?x=1",
+        "target": {
+          "groupId": "g1",
+          "storyId": "s1"
+        }
+      },
+      "expect": {
+        "url": "https://news.example.com/article?x=1#stories=g1/s1"
+      }
+    },
+    {
+      "name": "web: a group link replaces an existing fragment",
+      "input": {
+        "op": "shareUrl",
+        "pageUrl": "https://news.example.com/a#top",
+        "target": {
+          "groupId": "g 1"
+        }
+      },
+      "expect": {
+        "url": "https://news.example.com/a#stories=g%201"
+      }
+    },
+    {
+      "name": "web: reading a story link",
+      "input": {
+        "op": "parseShareLink",
+        "url": "https://news.example.com/a#stories=g1/s1"
+      },
+      "expect": {
+        "target": {
+          "groupId": "g1",
+          "storyId": "s1"
+        }
+      }
+    },
+    {
+      "name": "web: reading a group link",
+      "input": {
+        "op": "parseShareLink",
+        "url": "https://news.example.com/a#stories=g%201"
+      },
+      "expect": {
+        "target": {
+          "groupId": "g 1"
+        }
+      }
+    },
+    {
+      "name": "web: other fragments aren't story links",
+      "input": {
+        "op": "parseShareLink",
+        "url": "https://news.example.com/a#top"
+      },
+      "expect": {
+        "target": null
+      }
+    },
+    {
+      "name": "web: too many parts isn't a story link",
+      "input": {
+        "op": "parseShareLink",
+        "url": "https://news.example.com/a#stories=a/b/c"
+      },
+      "expect": {
+        "target": null
+      }
+    },
+    {
+      "name": "web: dropping a story link from the address",
+      "input": {
+        "op": "withoutShareLink",
+        "url": "https://news.example.com/a?x=1#stories=g1/s1"
+      },
+      "expect": {
+        "url": "https://news.example.com/a?x=1"
+      }
+    },
+    {
+      "name": "web: other fragments are kept",
+      "input": {
+        "op": "withoutShareLink",
+        "url": "https://news.example.com/a#top"
+      },
+      "expect": {
+        "url": "https://news.example.com/a#top"
+      }
+    },
+    {
+      "name": "app: filling in the share link",
+      "input": {
+        "op": "appShareUrl",
+        "template": "https://news.example.com/stories/{group}/{story}",
+        "target": {
+          "groupId": "g 1",
+          "storyId": "s/2"
+        }
+      },
+      "expect": {
+        "url": "https://news.example.com/stories/g%201/s%2F2"
+      }
+    },
+    {
+      "name": "app: placeholders can repeat",
+      "input": {
+        "op": "appShareUrl",
+        "template": "https://x.example/s?id={story}&g={group}&again={story}",
+        "target": {
+          "groupId": "g",
+          "storyId": "s"
+        }
+      },
+      "expect": {
+        "url": "https://x.example/s?id=s&g=g&again=s"
+      }
+    },
+    {
+      "name": "button: https",
+      "input": {
+        "op": "ctaAllowed",
+        "url": "https://shop.example.com/p/1"
+      },
+      "expect": {
+        "allowed": true
+      }
+    },
+    {
+      "name": "button: http",
+      "input": {
+        "op": "ctaAllowed",
+        "url": "http://shop.example.com"
+      },
+      "expect": {
+        "allowed": true
+      }
+    },
+    {
+      "name": "button: an app's own scheme",
+      "input": {
+        "op": "ctaAllowed",
+        "url": "myshop://product/1",
+        "schemes": ["myshop"]
+      },
+      "expect": {
+        "allowed": true
+      }
+    },
+    {
+      "name": "button: schemes are case-insensitive",
+      "input": {
+        "op": "ctaAllowed",
+        "url": "MYSHOP://product/1",
+        "schemes": ["myshop"]
+      },
+      "expect": {
+        "allowed": true
+      }
+    },
+    {
+      "name": "button: other schemes aren't allowed",
+      "input": {
+        "op": "ctaAllowed",
+        "url": "otherapp://x",
+        "schemes": ["myshop"]
+      },
+      "expect": {
+        "allowed": false
+      }
+    },
+    {
+      "name": "button: javascript is never allowed",
+      "input": {
+        "op": "ctaAllowed",
+        "url": "javascript:alert(1)",
+        "schemes": ["javascript"]
+      },
+      "expect": {
+        "allowed": false
+      }
+    },
+    {
+      "name": "button: data URLs aren't allowed",
+      "input": {
+        "op": "ctaAllowed",
+        "url": "data:text/html,hi"
+      },
+      "expect": {
+        "allowed": false
+      }
+    },
+    {
+      "name": "button: relative paths aren't allowed",
+      "input": {
+        "op": "ctaAllowed",
+        "url": "/relative"
+      },
+      "expect": {
+        "allowed": false
+      }
+    },
+    {
+      "name": "button: an empty scheme link isn't allowed",
+      "input": {
+        "op": "ctaAllowed",
+        "url": "myshop:",
+        "schemes": ["myshop"]
+      },
+      "expect": {
+        "allowed": false
+      }
+    },
+    {
+      "name": "button style: each known style is kept",
+      "input": {
+        "op": "ctaStyle",
+        "style": "swipe-pill"
+      },
+      "expect": {
+        "style": "swipe-pill",
+        "swipe": true
+      }
+    },
+    {
+      "name": "button style: dark",
+      "input": {
+        "op": "ctaStyle",
+        "style": "dark"
+      },
+      "expect": {
+        "style": "dark",
+        "swipe": false
+      }
+    },
+    {
+      "name": "button style: outline",
+      "input": {
+        "op": "ctaStyle",
+        "style": "outline"
+      },
+      "expect": {
+        "style": "outline",
+        "swipe": false
+      }
+    },
+    {
+      "name": "button style: swipe up",
+      "input": {
+        "op": "ctaStyle",
+        "style": "swipe"
+      },
+      "expect": {
+        "style": "swipe",
+        "swipe": true
+      }
+    },
+    {
+      "name": "button style: none (older servers) is a pill",
+      "input": {
+        "op": "ctaStyle"
+      },
+      "expect": {
+        "style": "pill",
+        "swipe": false
+      }
+    },
+    {
+      "name": "button style: unknown is a pill",
+      "input": {
+        "op": "ctaStyle",
+        "style": "sparkly"
+      },
+      "expect": {
+        "style": "pill",
+        "swipe": false
+      }
+    },
+    {
+      "name": "button style: not text is a pill",
+      "input": {
+        "op": "ctaStyle",
+        "style": 3
+      },
+      "expect": {
+        "style": "pill",
+        "swipe": false
+      }
+    }
+  ]
+}

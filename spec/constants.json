@@ -1,0 +1,58 @@
+{
+  "viewableMs": {
+    "image": 1000,
+    "video": 2000
+  },
+  "tapMaxMs": 250,
+  "sessionTimeoutMs": 1800000,
+  "viewerIdMaxAgeMs": 34128000000,
+  "imageDurationDefaultMs": 5000,
+  "analytics": {
+    "flushIntervalMs": 5000,
+    "maxBatch": 50,
+    "maxQueue": 500
+  },
+  "seenMaxIds": 1000,
+  "tags": {
+    "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$",
+    "maxLength": 64,
+    "maxPerPerson": 50,
+    "maxConditions": 10
+  },
+  "storage": {
+    "seen": "stories:seen:<appId>",
+    "viewer": "stories:viewer",
+    "feed": "stories:feed:<token>[:<barKey>][#<tags>]",
+    "answers": "stories:answers:<appId>"
+  },
+  "labels": {
+    "openGroup": ["Sale, 1 story", "Sale, 3 stories, viewed"],
+    "storyPosition": "Sale: story 1 of 3",
+    "viewer": "Stories: Sale",
+    "close": "Close stories",
+    "pause": "Pause",
+    "play": "Play",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "previous": "Previous story",
+    "next": "Next story",
+    "share": "Share story",
+    "linkCopied": "Link copied",
+    "shareFailed": "Couldn’t share this story",
+    "bar": "Stories",
+    "loading": "Loading stories",
+    "countdownUnits": ["days", "hours", "mins", "secs"],
+    "countdownEnded": "Ended",
+    "pollOption": "Red, 40%",
+    "slider": "How hot? Slide to answer",
+    "sliderAverage": "Average"
+  },
+  "answersMaxIds": 200,
+  "interactions": {
+    "unitsPerWidth": 600,
+    "defaultAccent": "#c2255c",
+    "defaultEmoji": "😍",
+    "correctColor": "#2f9e44",
+    "wrongColor": "#e03131"
+  }
+}

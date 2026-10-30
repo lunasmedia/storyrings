@@ -1,0 +1,4083 @@
+{
+  "suite": "viewer",
+  "description": "The story viewer state machine: navigation, timing, pausing, viewability and the analytics events each step produces. Events per step: action events (tap_forward, tap_back, group_skip, exit) first, then transition events (group_complete, group_open, story_view).",
+  "cases": [
+    {
+      "name": "opens at the first story of a group, buffering, and reports group_open",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": []
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": []
+      }
+    },
+    {
+      "name": "an image counts as viewed after 1 s on screen, then advances when it ends",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 999
+          },
+          {
+            "type": "TICK",
+            "ms": 1
+          },
+          {
+            "type": "TICK",
+            "ms": 3000
+          },
+          {
+            "type": "TICK",
+            "ms": 1000
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 999
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 999,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 999,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.1998, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 1000,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "A",
+                "storyId": "a1"
+              }
+            ],
+            "progress": [0.2, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 3000
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 4000,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.8, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1000
+            },
+            "state": {
+              "at": "a2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [1, 0, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "the timer doesn't run until the media is ready",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "TICK",
+            "ms": 3000
+          },
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 500
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 3000
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 500
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 500,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 500,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.1, 0, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "tapping forward and back moves between stories",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "NEXT"
+          },
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "PREV"
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "NEXT"
+            },
+            "state": {
+              "at": "a2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "tap_forward",
+                "groupId": "A",
+                "storyId": "a1"
+              }
+            ],
+            "progress": [1, 0, 0]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [1, 0, 0]
+          },
+          {
+            "action": {
+              "type": "PREV"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 3
+            },
+            "events": [
+              {
+                "type": "tap_back",
+                "groupId": "A",
+                "storyId": "a2"
+              }
+            ],
+            "progress": [0, 0, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "tapping forward on a group's last story completes it and opens the next group",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "NEXT"
+          },
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "NEXT"
+          },
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "NEXT"
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "NEXT"
+            },
+            "state": {
+              "at": "a2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "tap_forward",
+                "groupId": "A",
+                "storyId": "a1"
+              }
+            ],
+            "progress": [1, 0, 0]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [1, 0, 0]
+          },
+          {
+            "action": {
+              "type": "NEXT"
+            },
+            "state": {
+              "at": "a3",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 2,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 3
+            },
+            "events": [
+              {
+                "type": "tap_forward",
+                "groupId": "A",
+                "storyId": "a2"
+              }
+            ],
+            "progress": [1, 1, 0]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a3",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 2,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 3
+            },
+            "events": [],
+            "progress": [1, 1, 0]
+          },
+          {
+            "action": {
+              "type": "NEXT"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 4
+            },
+            "events": [
+              {
+                "type": "tap_forward",
+                "groupId": "A",
+                "storyId": "a3"
+              },
+              {
+                "type": "group_complete",
+                "groupId": "A"
+              },
+              {
+                "type": "group_open",
+                "groupId": "B"
+              }
+            ],
+            "progress": [0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "a group isn't completed if its last story never displayed",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "NEXT"
+          },
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "NEXT"
+          },
+          {
+            "type": "NEXT"
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "NEXT"
+            },
+            "state": {
+              "at": "a2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "tap_forward",
+                "groupId": "A",
+                "storyId": "a1"
+              }
+            ],
+            "progress": [1, 0, 0]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [1, 0, 0]
+          },
+          {
+            "action": {
+              "type": "NEXT"
+            },
+            "state": {
+              "at": "a3",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 2,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 3
+            },
+            "events": [
+              {
+                "type": "tap_forward",
+                "groupId": "A",
+                "storyId": "a2"
+              }
+            ],
+            "progress": [1, 1, 0]
+          },
+          {
+            "action": {
+              "type": "NEXT"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 4
+            },
+            "events": [
+              {
+                "type": "tap_forward",
+                "groupId": "A",
+                "storyId": "a3"
+              },
+              {
+                "type": "group_open",
+                "groupId": "B"
+              }
+            ],
+            "progress": [0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "back from a group's first story lands on the previous group's last story",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 1,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "PREV"
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "b1",
+          "open": true,
+          "groupIndex": 1,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 6000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "B"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0]
+          },
+          {
+            "action": {
+              "type": "PREV"
+            },
+            "state": {
+              "at": "a3",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 2,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "tap_back",
+                "groupId": "B",
+                "storyId": "b1"
+              },
+              {
+                "type": "group_open",
+                "groupId": "A"
+              }
+            ],
+            "progress": [1, 1, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "back on the very first story restarts it",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 2000
+          },
+          {
+            "type": "PREV"
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 2000
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 2000,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 2000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "A",
+                "storyId": "a1"
+              }
+            ],
+            "progress": [0.4, 0, 0]
+          },
+          {
+            "action": {
+              "type": "PREV"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "tap_back",
+                "groupId": "A",
+                "storyId": "a1"
+              }
+            ],
+            "progress": [0, 0, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "skipping to the next and previous group",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "NEXT_GROUP"
+          },
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "PREV_GROUP"
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "NEXT_GROUP"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "group_skip",
+                "groupId": "A",
+                "storyId": "a1"
+              },
+              {
+                "type": "group_open",
+                "groupId": "B"
+              }
+            ],
+            "progress": [0]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [0]
+          },
+          {
+            "action": {
+              "type": "PREV_GROUP"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 3
+            },
+            "events": [
+              {
+                "type": "group_open",
+                "groupId": "A"
+              }
+            ],
+            "progress": [0, 0, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "closing reports exit and closes with reason user",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "CLOSE"
+          },
+          {
+            "type": "NEXT"
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "CLOSE"
+            },
+            "state": {
+              "at": "closed",
+              "open": false,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 0,
+              "paused": false,
+              "buffering": false,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": "user",
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "exit",
+                "groupId": "A",
+                "storyId": "a1"
+              }
+            ],
+            "progress": []
+          },
+          {
+            "action": {
+              "type": "NEXT"
+            },
+            "state": {
+              "at": "closed",
+              "open": false,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 0,
+              "paused": false,
+              "buffering": false,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": "user",
+              "seq": 1
+            },
+            "events": [],
+            "progress": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "finishing the last story of the last group closes with reason completed",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 2,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 1000
+          },
+          {
+            "type": "TICK",
+            "ms": 7000
+          },
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 1000
+          },
+          {
+            "type": "TICK",
+            "ms": 4000
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "c1",
+          "open": true,
+          "groupIndex": 2,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 8000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "C"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "c1",
+              "open": true,
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 8000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1000
+            },
+            "state": {
+              "at": "c1",
+              "open": true,
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "elapsedMs": 1000,
+              "durationMs": 8000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "C",
+                "storyId": "c1"
+              }
+            ],
+            "progress": [0.125, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 7000
+            },
+            "state": {
+              "at": "c2",
+              "open": true,
+              "groupIndex": 2,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [1, 0]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "c2",
+              "open": true,
+              "groupIndex": 2,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [1, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1000
+            },
+            "state": {
+              "at": "c2",
+              "open": true,
+              "groupIndex": 2,
+              "storyIndex": 1,
+              "elapsedMs": 1000,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "C",
+                "storyId": "c2"
+              }
+            ],
+            "progress": [1, 0.2]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 4000
+            },
+            "state": {
+              "at": "closed",
+              "open": false,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 0,
+              "paused": false,
+              "buffering": false,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": "completed",
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "group_complete",
+                "groupId": "C"
+              }
+            ],
+            "progress": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "a video ending by itself moves on without tap_forward",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 1,
+        "steps": [
+          {
+            "type": "MEDIA_READY",
+            "durationMs": 6000
+          },
+          {
+            "type": "TICK",
+            "ms": 2000
+          },
+          {
+            "type": "NEXT",
+            "auto": true
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "b1",
+          "open": true,
+          "groupIndex": 1,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 6000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "B"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY",
+              "durationMs": 6000
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 2000
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 2000,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 2000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "B",
+                "storyId": "b1"
+              }
+            ],
+            "progress": [0.3333333333333333]
+          },
+          {
+            "action": {
+              "type": "NEXT",
+              "auto": true
+            },
+            "state": {
+              "at": "c1",
+              "open": true,
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 8000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "group_complete",
+                "groupId": "B"
+              },
+              {
+                "type": "group_open",
+                "groupId": "C"
+              }
+            ],
+            "progress": [0, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "a video needs 2 s of continuous playback; pausing and buffering restart the count",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 1,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 1500
+          },
+          {
+            "type": "PAUSE"
+          },
+          {
+            "type": "RESUME"
+          },
+          {
+            "type": "TICK",
+            "ms": 1500
+          },
+          {
+            "type": "MEDIA_LOADING"
+          },
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 1999
+          },
+          {
+            "type": "TICK",
+            "ms": 1
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "b1",
+          "open": true,
+          "groupIndex": 1,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 6000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "B"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1500
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 1500,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1500,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.25]
+          },
+          {
+            "action": {
+              "type": "PAUSE"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 1500,
+              "durationMs": 6000,
+              "paused": true,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.25]
+          },
+          {
+            "action": {
+              "type": "RESUME"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 1500,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.25]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1500
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 3000,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1500,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.5]
+          },
+          {
+            "action": {
+              "type": "MEDIA_LOADING"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 3000,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": true,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.5]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 3000,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.5]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1999
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 4999,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1999,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.8331666666666667]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 5000,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 2000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "B",
+                "storyId": "b1"
+              }
+            ],
+            "progress": [0.8333333333333334]
+          }
+        ]
+      }
+    },
+    {
+      "name": "an image held paused still counts as on screen, but its timer stops",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "PAUSE"
+          },
+          {
+            "type": "TICK",
+            "ms": 1200
+          },
+          {
+            "type": "RESUME"
+          },
+          {
+            "type": "TICK",
+            "ms": 100
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "PAUSE"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": true,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1200
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": true,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1200,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "A",
+                "storyId": "a1"
+              }
+            ],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "RESUME"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1200,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 100
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 100,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1200,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.02, 0, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "going off screen restarts the viewability count",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 800
+          },
+          {
+            "type": "HIDE"
+          },
+          {
+            "type": "TICK",
+            "ms": 500
+          },
+          {
+            "type": "SHOW"
+          },
+          {
+            "type": "TICK",
+            "ms": 800
+          },
+          {
+            "type": "TICK",
+            "ms": 200
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 800
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 800,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 800,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.16, 0, 0]
+          },
+          {
+            "action": {
+              "type": "HIDE"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 800,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": true,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.16, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 500
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 1300,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": true,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.26, 0, 0]
+          },
+          {
+            "action": {
+              "type": "SHOW"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 1300,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.26, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 800
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 2100,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 800,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0.42, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 200
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 2300,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "A",
+                "storyId": "a1"
+              }
+            ],
+            "progress": [0.46, 0, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "media that fails to load is never viewed, but the viewer still moves on",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 2,
+        "steps": [
+          {
+            "type": "MEDIA_READY",
+            "failed": true
+          },
+          {
+            "type": "TICK",
+            "ms": 8000
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "c1",
+          "open": true,
+          "groupIndex": 2,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 8000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "C"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY",
+              "failed": true
+            },
+            "state": {
+              "at": "c1",
+              "open": true,
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 8000,
+              "paused": false,
+              "buffering": false,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 8000
+            },
+            "state": {
+              "at": "c2",
+              "open": true,
+              "groupIndex": 2,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [1, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "a loaded video's real duration replaces the feed's",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 1,
+        "steps": [
+          {
+            "type": "MEDIA_READY",
+            "durationMs": 4200
+          },
+          {
+            "type": "MEDIA_READY",
+            "durationMs": 0
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "b1",
+          "open": true,
+          "groupIndex": 1,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 6000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "B"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY",
+              "durationMs": 4200
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 4200,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY",
+              "durationMs": 0
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 4200,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "a story that qualifies as it ends counts before moving on",
+      "input": {
+        "groups": [
+          {
+            "id": "S",
+            "stories": [
+              {
+                "id": "s1",
+                "durationMs": 1000
+              },
+              {
+                "id": "s2",
+                "durationMs": 1000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 1000
+          },
+          {
+            "type": "TICK",
+            "ms": 1
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "s1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 1000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "S"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "s1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 1000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1000
+            },
+            "state": {
+              "at": "s1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 1000,
+              "durationMs": 1000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 1000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "S",
+                "storyId": "s1"
+              }
+            ],
+            "progress": [1, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 1
+            },
+            "state": {
+              "at": "s2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 1000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [1, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "non-positive ticks change nothing",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 0
+          },
+          {
+            "type": "TICK",
+            "ms": -50
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 0
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": -50
+            },
+            "state": {
+              "at": "a1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "entering a group starts at its first unseen story",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "startStoryIndex": {
+          "0": 1,
+          "2": 1
+        },
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "NEXT_GROUP"
+          },
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "NEXT_GROUP"
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "a2",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 1,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "a2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [1, 0, 0]
+          },
+          {
+            "action": {
+              "type": "NEXT_GROUP"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [
+              {
+                "type": "group_skip",
+                "groupId": "A",
+                "storyId": "a2"
+              },
+              {
+                "type": "group_open",
+                "groupId": "B"
+              }
+            ],
+            "progress": [0]
+          },
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "b1",
+              "open": true,
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 6000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [0]
+          },
+          {
+            "action": {
+              "type": "NEXT_GROUP"
+            },
+            "state": {
+              "at": "c2",
+              "open": true,
+              "groupIndex": 2,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 5000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 3
+            },
+            "events": [
+              {
+                "type": "group_skip",
+                "groupId": "B",
+                "storyId": "b1"
+              },
+              {
+                "type": "group_complete",
+                "groupId": "B"
+              },
+              {
+                "type": "group_open",
+                "groupId": "C"
+              }
+            ],
+            "progress": [1, 0]
+          }
+        ]
+      }
+    },
+    {
+      "name": "an out-of-range start story falls back to the first",
+      "input": {
+        "groups": [
+          {
+            "id": "A",
+            "stories": [
+              {
+                "id": "a1",
+                "durationMs": 5000
+              },
+              {
+                "id": "a2",
+                "durationMs": 5000
+              },
+              {
+                "id": "a3",
+                "durationMs": 5000
+              }
+            ]
+          },
+          {
+            "id": "B",
+            "stories": [
+              {
+                "id": "b1",
+                "durationMs": 6000,
+                "type": "video"
+              }
+            ]
+          },
+          {
+            "id": "C",
+            "stories": [
+              {
+                "id": "c1",
+                "durationMs": 8000
+              },
+              {
+                "id": "c2",
+                "durationMs": 5000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "startStoryIndex": {
+          "0": 7
+        },
+        "steps": []
+      },
+      "expect": {
+        "opened": {
+          "at": "a1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 5000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "A"
+          }
+        ],
+        "steps": []
+      }
+    },
+    {
+      "name": "a group without stories doesn't open",
+      "input": {
+        "groups": [
+          {
+            "id": "E",
+            "stories": []
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "NEXT"
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "closed",
+          "open": false,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 0,
+          "paused": false,
+          "buffering": false,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 0
+        },
+        "events": [],
+        "steps": [
+          {
+            "action": {
+              "type": "NEXT"
+            },
+            "state": {
+              "at": "closed",
+              "open": false,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 0,
+              "paused": false,
+              "buffering": false,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 0
+            },
+            "events": [],
+            "progress": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "a tick that makes a story viewed reports it first and advances on the next tick",
+      "input": {
+        "groups": [
+          {
+            "id": "S",
+            "stories": [
+              {
+                "id": "s1",
+                "durationMs": 1000
+              },
+              {
+                "id": "s2",
+                "durationMs": 1000
+              }
+            ]
+          }
+        ],
+        "open": 0,
+        "steps": [
+          {
+            "type": "MEDIA_READY"
+          },
+          {
+            "type": "TICK",
+            "ms": 5000
+          },
+          {
+            "type": "TICK",
+            "ms": 16
+          }
+        ]
+      },
+      "expect": {
+        "opened": {
+          "at": "s1",
+          "open": true,
+          "groupIndex": 0,
+          "storyIndex": 0,
+          "elapsedMs": 0,
+          "durationMs": 1000,
+          "paused": false,
+          "buffering": true,
+          "displayed": false,
+          "hidden": false,
+          "viewableMs": 0,
+          "viewed": false,
+          "closeReason": null,
+          "seq": 1
+        },
+        "events": [
+          {
+            "type": "group_open",
+            "groupId": "S"
+          }
+        ],
+        "steps": [
+          {
+            "action": {
+              "type": "MEDIA_READY"
+            },
+            "state": {
+              "at": "s1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 0,
+              "durationMs": 1000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [],
+            "progress": [0, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 5000
+            },
+            "state": {
+              "at": "s1",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "elapsedMs": 1000,
+              "durationMs": 1000,
+              "paused": false,
+              "buffering": false,
+              "displayed": true,
+              "hidden": false,
+              "viewableMs": 5000,
+              "viewed": true,
+              "closeReason": null,
+              "seq": 1
+            },
+            "events": [
+              {
+                "type": "story_view",
+                "groupId": "S",
+                "storyId": "s1"
+              }
+            ],
+            "progress": [1, 0]
+          },
+          {
+            "action": {
+              "type": "TICK",
+              "ms": 16
+            },
+            "state": {
+              "at": "s2",
+              "open": true,
+              "groupIndex": 0,
+              "storyIndex": 1,
+              "elapsedMs": 0,
+              "durationMs": 1000,
+              "paused": false,
+              "buffering": true,
+              "displayed": false,
+              "hidden": false,
+              "viewableMs": 0,
+              "viewed": false,
+              "closeReason": null,
+              "seq": 2
+            },
+            "events": [],
+            "progress": [1, 0]
+          }
+        ]
+      }
+    }
+  ]
+}

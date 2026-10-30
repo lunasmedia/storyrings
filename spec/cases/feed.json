@@ -1,0 +1,300 @@
+{
+  "suite": "feed",
+  "description": "Parsing a /v1/feed response defensively: malformed groups and stories are dropped rather than crashing the app.",
+  "cases": [
+    {
+      "name": "a valid feed is kept",
+      "input": {
+        "body": {
+          "app": {
+            "id": "app",
+            "deepLinkSchemes": ["myshop"],
+            "sharing": true
+          },
+          "bar": {
+            "id": "b1",
+            "key": "main"
+          },
+          "groups": [
+            {
+              "id": "g1",
+              "title": "Sale",
+              "coverUrl": "https://cdn.example.com/c.png",
+              "stories": [
+                {
+                  "id": "s1",
+                  "url": "https://cdn.example.com/s1.jpg",
+                  "type": "image",
+                  "durationMs": 5000
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "feed": {
+          "bar": {
+            "id": "b1",
+            "key": "main"
+          },
+          "app": {
+            "id": "app",
+            "deepLinkSchemes": ["myshop"],
+            "sharing": true
+          },
+          "groups": [
+            {
+              "id": "g1",
+              "title": "Sale",
+              "coverUrl": "https://cdn.example.com/c.png",
+              "stories": [
+                {
+                  "id": "s1",
+                  "url": "https://cdn.example.com/s1.jpg",
+                  "type": "image",
+                  "durationMs": 5000
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "malformed groups are dropped",
+      "input": {
+        "body": {
+          "app": {
+            "id": "app",
+            "deepLinkSchemes": ["myshop"],
+            "sharing": true
+          },
+          "groups": [
+            {
+              "id": "g1",
+              "title": "Sale",
+              "coverUrl": "https://cdn.example.com/c.png",
+              "stories": [
+                {
+                  "id": "s1",
+                  "url": "https://cdn.example.com/s1.jpg",
+                  "type": "image",
+                  "durationMs": 5000
+                }
+              ]
+            },
+            null,
+            {
+              "id": 5,
+              "title": "x",
+              "stories": []
+            },
+            {
+              "id": "g2",
+              "stories": [
+                {
+                  "id": "s1",
+                  "url": "https://cdn.example.com/s1.jpg",
+                  "type": "image",
+                  "durationMs": 5000
+                }
+              ]
+            },
+            {
+              "id": "g3",
+              "title": "Sale",
+              "coverUrl": "https://cdn.example.com/c.png",
+              "stories": "nope"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "feed": {
+          "app": {
+            "id": "app",
+            "deepLinkSchemes": ["myshop"],
+            "sharing": true
+          },
+          "groups": [
+            {
+              "id": "g1",
+              "title": "Sale",
+              "coverUrl": "https://cdn.example.com/c.png",
+              "stories": [
+                {
+                  "id": "s1",
+                  "url": "https://cdn.example.com/s1.jpg",
+                  "type": "image",
+                  "durationMs": 5000
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "malformed stories are dropped, and groups left empty go too",
+      "input": {
+        "body": {
+          "app": {
+            "id": "app",
+            "deepLinkSchemes": ["myshop"],
+            "sharing": true
+          },
+          "groups": [
+            {
+              "id": "g1",
+              "title": "Sale",
+              "coverUrl": "https://cdn.example.com/c.png",
+              "stories": [
+                {
+                  "id": "s1",
+                  "url": "https://cdn.example.com/s1.jpg",
+                  "type": "image",
+                  "durationMs": 5000
+                },
+                {
+                  "id": "s2",
+                  "url": "u",
+                  "type": "gif",
+                  "durationMs": 5000
+                },
+                {
+                  "id": "s3",
+                  "url": "u",
+                  "type": "video",
+                  "durationMs": 0
+                },
+                {
+                  "id": "s4",
+                  "type": "image",
+                  "durationMs": 5000
+                },
+                null
+              ]
+            },
+            {
+              "id": "g2",
+              "title": "Sale",
+              "coverUrl": "https://cdn.example.com/c.png",
+              "stories": [
+                {
+                  "id": "x",
+                  "url": "u",
+                  "type": "image",
+                  "durationMs": -1
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "feed": {
+          "app": {
+            "id": "app",
+            "deepLinkSchemes": ["myshop"],
+            "sharing": true
+          },
+          "groups": [
+            {
+              "id": "g1",
+              "title": "Sale",
+              "coverUrl": "https://cdn.example.com/c.png",
+              "stories": [
+                {
+                  "id": "s1",
+                  "url": "https://cdn.example.com/s1.jpg",
+                  "type": "image",
+                  "durationMs": 5000
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "sharing is only on when it's exactly true; schemes default to none",
+      "input": {
+        "body": {
+          "app": {
+            "id": "app",
+            "sharing": "yes"
+          },
+          "groups": []
+        }
+      },
+      "expect": {
+        "feed": {
+          "app": {
+            "id": "app",
+            "deepLinkSchemes": [],
+            "sharing": false
+          },
+          "groups": []
+        }
+      }
+    },
+    {
+      "name": "a mobile app's share link and the bar layout are passed through",
+      "input": {
+        "body": {
+          "app": {
+            "id": "app",
+            "deepLinkSchemes": [],
+            "sharing": true,
+            "shareLink": "https://news.example.com/s/{group}/{story}",
+            "layout": {
+              "width": 72,
+              "height": 96,
+              "corner": 12,
+              "gap": 10
+            }
+          },
+          "groups": []
+        }
+      },
+      "expect": {
+        "feed": {
+          "app": {
+            "id": "app",
+            "deepLinkSchemes": [],
+            "sharing": true,
+            "shareLink": "https://news.example.com/s/{group}/{story}",
+            "layout": {
+              "width": 72,
+              "height": 96,
+              "corner": 12,
+              "gap": 10
+            }
+          },
+          "groups": []
+        }
+      }
+    },
+    {
+      "name": "a missing app or groups list is an invalid response",
+      "input": {
+        "body": {
+          "groups": []
+        }
+      },
+      "expect": {
+        "error": "invalid_response"
+      }
+    },
+    {
+      "name": "a non-object body is an invalid response",
+      "input": {
+        "body": "oops"
+      },
+      "expect": {
+        "error": "invalid_response"
+      }
+    }
+  ]
+}

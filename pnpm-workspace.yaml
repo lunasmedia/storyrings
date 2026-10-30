@@ -1,0 +1,8 @@
+packages:
+  - packages/*
+
+# Don't install package versions published less than 7 days ago (supply-chain guard).
+minimumReleaseAge: 10080
+
+onlyBuiltDependencies:
+  - esbuild

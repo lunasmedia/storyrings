@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  // Workspace packages ship .ts sources. Map them to their real paths (not the
+  // node_modules symlinks) so their types are inlined into dist/index.d.ts.
+  "compilerOptions": {
+    "paths": {
+      "@stories/core": ["../core/src/index.ts"],
+      "@stories/contracts/*": ["../contracts/src/*.ts"]
+    }
+  },
+  "include": ["src", "../core/src", "../contracts/src"]
+}

@@ -1,0 +1,55 @@
+{
+  "files": {
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/.data",
+      "!**/migrations",
+      "!packages/web/demo",
+      "!apps/example-rn/ios",
+      "!apps/example-rn/android",
+      "!**/.expo",
+      "!**/.dart_tool",
+      "!packages/flutter/build",
+      "!apps/example-flutter/build",
+      "!apps/example-flutter/ios",
+      "!**/.build",
+      "!**/.swiftpm",
+      "!**/*.xcodeproj",
+      "!**/.gradle",
+      "!packages/android/**/build",
+      "!apps/example-android/**/build"
+    ]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single"
+    }
+  },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noNonNullAssertion": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/test/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ]
+}

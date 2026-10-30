@@ -1,0 +1,92 @@
+{
+  "suite": "sessions",
+  "description": "App sessions (active users): a new session starts after 30 minutes away. The anonymous viewer ID (unique users) is kept for 13 months, then replaced.",
+  "cases": [
+    {
+      "name": "first launch: no previous session to compare",
+      "input": {
+        "op": "newSession",
+        "leftAt": null,
+        "now": 0
+      },
+      "expect": {
+        "newSession": false
+      }
+    },
+    {
+      "name": "back within 30 minutes: same session",
+      "input": {
+        "op": "newSession",
+        "leftAt": 0,
+        "now": 1799999
+      },
+      "expect": {
+        "newSession": false
+      }
+    },
+    {
+      "name": "back after 30 minutes: new session",
+      "input": {
+        "op": "newSession",
+        "leftAt": 0,
+        "now": 1800000
+      },
+      "expect": {
+        "newSession": true
+      }
+    },
+    {
+      "name": "a stored ID younger than 13 months is kept",
+      "input": {
+        "op": "viewerId",
+        "stored": {
+          "id": "abc",
+          "created": 0
+        },
+        "now": 34127999999
+      },
+      "expect": {
+        "kept": true,
+        "stored": true
+      }
+    },
+    {
+      "name": "an ID 13 months old is replaced",
+      "input": {
+        "op": "viewerId",
+        "stored": {
+          "id": "abc",
+          "created": 0
+        },
+        "now": 34128000000
+      },
+      "expect": {
+        "kept": false,
+        "stored": true
+      }
+    },
+    {
+      "name": "unreadable storage gets a fresh ID",
+      "input": {
+        "op": "viewerId",
+        "stored": "not json",
+        "now": 0
+      },
+      "expect": {
+        "kept": false,
+        "stored": true
+      }
+    },
+    {
+      "name": "no stored ID gets a fresh one",
+      "input": {
+        "op": "viewerId",
+        "now": 0
+      },
+      "expect": {
+        "kept": false,
+        "stored": true
+      }
+    }
+  ]
+}

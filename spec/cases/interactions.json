@@ -1,0 +1,501 @@
+{
+  "suite": "interactions",
+  "description": "Interactive stickers: reading them from the feed defensively, placing them on the image as displayed, poll percentages and the countdown.",
+  "cases": [
+    {
+      "name": "valid stickers of every kind are kept",
+      "input": {
+        "op": "parse",
+        "interactions": [
+          {
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "id": "p",
+            "kind": "poll",
+            "question": "Which?",
+            "options": ["Red", "Blue"]
+          },
+          {
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "id": "q",
+            "kind": "quiz",
+            "question": "Capital?",
+            "options": ["Paris", "Rome", "Oslo"],
+            "correct": 2
+          },
+          {
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "id": "s",
+            "kind": "slider",
+            "question": "How hot?",
+            "emoji": "🔥"
+          },
+          {
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "id": "l",
+            "kind": "link",
+            "label": "Shop",
+            "url": "https://shop.example.com"
+          },
+          {
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "id": "c",
+            "kind": "countdown",
+            "title": "Ends in",
+            "endsAt": "2026-12-01T18:00:00.000Z"
+          }
+        ]
+      },
+      "expect": {
+        "interactions": [
+          {
+            "id": "p",
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "kind": "poll",
+            "question": "Which?",
+            "options": ["Red", "Blue"]
+          },
+          {
+            "id": "q",
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "kind": "quiz",
+            "question": "Capital?",
+            "options": ["Paris", "Rome", "Oslo"],
+            "correct": 2
+          },
+          {
+            "id": "s",
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "kind": "slider",
+            "question": "How hot?",
+            "emoji": "🔥"
+          },
+          {
+            "id": "l",
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "kind": "link",
+            "label": "Shop",
+            "url": "https://shop.example.com"
+          },
+          {
+            "id": "c",
+            "x": 540,
+            "y": 1200,
+            "width": 760,
+            "accent": "#2f9e44",
+            "kind": "countdown",
+            "title": "Ends in",
+            "endsAt": "2026-12-01T18:00:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing text and colours get defaults; extra options are cut to four",
+      "input": {
+        "op": "parse",
+        "interactions": [
+          {
+            "id": "p",
+            "kind": "poll",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "options": ["A", 7, "B", "C", "D", "E"]
+          },
+          {
+            "id": "s",
+            "kind": "slider",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "accent": "red",
+            "emoji": ""
+          },
+          {
+            "id": "c",
+            "kind": "countdown",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "endsAt": "2026-12-01T18:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "interactions": [
+          {
+            "id": "p",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "accent": "#c2255c",
+            "kind": "poll",
+            "question": "",
+            "options": ["A", "B", "C", "D"]
+          },
+          {
+            "id": "s",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "accent": "#c2255c",
+            "kind": "slider",
+            "question": "",
+            "emoji": "😍"
+          },
+          {
+            "id": "c",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "accent": "#c2255c",
+            "kind": "countdown",
+            "title": "",
+            "endsAt": "2026-12-01T18:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed stickers are dropped",
+      "input": {
+        "op": "parse",
+        "interactions": [
+          null,
+          "poll",
+          {
+            "kind": "poll",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "options": ["A", "B"]
+          },
+          {
+            "id": "u",
+            "kind": "hologram",
+            "x": 1,
+            "y": 2,
+            "width": 500
+          },
+          {
+            "id": "x",
+            "kind": "poll",
+            "x": "1",
+            "y": 2,
+            "width": 500,
+            "options": ["A", "B"]
+          },
+          {
+            "id": "w",
+            "kind": "poll",
+            "x": 1,
+            "y": 2,
+            "width": 0,
+            "options": ["A", "B"]
+          },
+          {
+            "id": "o",
+            "kind": "poll",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "options": ["Only one"]
+          },
+          {
+            "id": "q",
+            "kind": "quiz",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "options": ["A", "B"],
+            "correct": 2
+          },
+          {
+            "id": "q2",
+            "kind": "quiz",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "options": ["A", "B"],
+            "correct": 0.5
+          },
+          {
+            "id": "l",
+            "kind": "link",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "label": "",
+            "url": "https://a.example"
+          },
+          {
+            "id": "l2",
+            "kind": "link",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "label": "Go"
+          },
+          {
+            "id": "c",
+            "kind": "countdown",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "endsAt": "soon"
+          },
+          {
+            "id": "ok",
+            "kind": "link",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "label": "Go",
+            "url": "myshop://sale"
+          }
+        ]
+      },
+      "expect": {
+        "interactions": [
+          {
+            "id": "ok",
+            "x": 1,
+            "y": 2,
+            "width": 500,
+            "accent": "#c2255c",
+            "kind": "link",
+            "label": "Go",
+            "url": "myshop://sale"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no list means no stickers",
+      "input": {
+        "op": "parse",
+        "interactions": null
+      },
+      "expect": {
+        "interactions": []
+      }
+    },
+    {
+      "name": "placing on a 9:16 screen: just scaled",
+      "input": {
+        "op": "place",
+        "container": [360, 640],
+        "media": [1080, 1920],
+        "fit": "cover",
+        "x": 540,
+        "y": 1200,
+        "width": 760
+      },
+      "expect": {
+        "x": 180,
+        "y": 400,
+        "width": 253.333,
+        "scale": 0.333
+      }
+    },
+    {
+      "name": "cover on a taller screen: the image is cropped at the sides",
+      "input": {
+        "op": "place",
+        "container": [390, 844],
+        "media": [1080, 1920],
+        "fit": "cover",
+        "x": 540,
+        "y": 960,
+        "width": 600
+      },
+      "expect": {
+        "x": 195,
+        "y": 422,
+        "width": 263.75,
+        "scale": 0.44
+      }
+    },
+    {
+      "name": "contain on a taller screen: the image is letterboxed",
+      "input": {
+        "op": "place",
+        "container": [390, 844],
+        "media": [1080, 1920],
+        "fit": "contain",
+        "x": 540,
+        "y": 1920,
+        "width": 600
+      },
+      "expect": {
+        "x": 195,
+        "y": 768.667,
+        "width": 216.667,
+        "scale": 0.361
+      }
+    },
+    {
+      "name": "contain on a wide frame: bars at the sides",
+      "input": {
+        "op": "place",
+        "container": [1000, 1000],
+        "media": [1080, 1920],
+        "fit": "contain",
+        "x": 0,
+        "y": 960,
+        "width": 1080
+      },
+      "expect": {
+        "x": 218.75,
+        "y": 500,
+        "width": 562.5,
+        "scale": 0.521
+      }
+    },
+    {
+      "name": "unknown media size counts as 1080 × 1920",
+      "input": {
+        "op": "place",
+        "container": [540, 960],
+        "media": null,
+        "fit": "cover",
+        "x": 100,
+        "y": 100,
+        "width": 300
+      },
+      "expect": {
+        "x": 50,
+        "y": 50,
+        "width": 150,
+        "scale": 0.5
+      }
+    },
+    {
+      "name": "percentages add up to 100",
+      "input": {
+        "op": "percentages",
+        "counts": [1, 1, 1]
+      },
+      "expect": {
+        "percents": [34, 33, 33]
+      }
+    },
+    {
+      "name": "largest remainders get the extra points",
+      "input": {
+        "op": "percentages",
+        "counts": [2, 1]
+      },
+      "expect": {
+        "percents": [67, 33]
+      }
+    },
+    {
+      "name": "no votes yet",
+      "input": {
+        "op": "percentages",
+        "counts": [0, 0]
+      },
+      "expect": {
+        "percents": [0, 0]
+      }
+    },
+    {
+      "name": "a clean split",
+      "input": {
+        "op": "percentages",
+        "counts": [3, 1, 0, 0]
+      },
+      "expect": {
+        "percents": [75, 25, 0, 0]
+      }
+    },
+    {
+      "name": "time left, in days, hours, minutes and seconds",
+      "input": {
+        "op": "countdown",
+        "endsAt": "2026-12-02T20:30:45.000Z",
+        "now": "2026-12-01T18:00:00.000Z"
+      },
+      "expect": {
+        "ended": false,
+        "days": 1,
+        "hours": 2,
+        "minutes": 30,
+        "seconds": 45
+      }
+    },
+    {
+      "name": "part seconds round down",
+      "input": {
+        "op": "countdown",
+        "endsAt": "2026-12-01T18:00:10.000Z",
+        "now": "2026-12-01T18:00:00.900Z"
+      },
+      "expect": {
+        "ended": false,
+        "days": 0,
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 9
+      }
+    },
+    {
+      "name": "ended at the moment it ends",
+      "input": {
+        "op": "countdown",
+        "endsAt": "2026-12-01T18:00:00.000Z",
+        "now": "2026-12-01T18:00:00.000Z"
+      },
+      "expect": {
+        "ended": true,
+        "days": 0,
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      }
+    },
+    {
+      "name": "and after",
+      "input": {
+        "op": "countdown",
+        "endsAt": "2026-12-01T18:00:00.000Z",
+        "now": "2027-01-01T00:00:00.000Z"
+      },
+      "expect": {
+        "ended": true,
+        "days": 0,
+        "hours": 0,
+        "minutes": 0,
+        "seconds": 0
+      }
+    }
+  ]
+}

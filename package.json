@@ -1,0 +1,21 @@
+{
+  "name": "storyrings-sdks",
+  "private": true,
+  "packageManager": "pnpm@10.18.3",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "pnpm --filter @lunasmedia/storyrings-web --filter @lunasmedia/storyrings-react --filter @lunasmedia/storyrings-react-native build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "test:flutter": "cd packages/flutter && flutter test",
+    "test:ios": "swift build",
+    "test:android": "cd packages/android && ./gradlew test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "typescript": "~5.9.3"
+  }
+}

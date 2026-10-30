@@ -40,7 +40,7 @@ Local demo token (after `pnpm db:seed`): `pk_live_DemoMobileAppToken000000`
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.stories:sdk:0.1.0")
+    implementation("io.github.brad-jeancy:storyrings-android:0.1.0")
 }
 ```
 
@@ -146,7 +146,7 @@ container.addView(stories, ViewGroup.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 // stories.open(groupId)             // from a push notification
 ```
 
-In XML: `<com.stories.sdk.StoriesBarView android:id="@+id/stories"
+In XML: `<com.lunasmedia.storyrings.StoriesBarView android:id="@+id/stories"
 android:layout_width="match_parent" android:layout_height="wrap_content" />`, then set `token`
 and `apiUrl` in code.
 

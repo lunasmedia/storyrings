@@ -1,5 +1,6 @@
 plugins {
     id("org.jetbrains.kotlin.jvm")
+    id("com.vanniktech.maven.publish")
 }
 
 java {
@@ -19,4 +20,11 @@ tasks.test {
     // The spec lives at the repository root.
     systemProperty("stories.spec", rootProject.file("../../spec").absolutePath)
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
+}
+
+mavenPublishing {
+    pom {
+        name.set("StoryRings Core")
+        description.set("Shared logic for the StoryRings Android SDK: feed, viewer state and analytics.")
+    }
 }

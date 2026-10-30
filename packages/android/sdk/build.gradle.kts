@@ -2,10 +2,11 @@ plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.vanniktech.maven.publish")
 }
 
 android {
-    namespace = "com.stories.sdk"
+    namespace = "com.lunasmedia.storyrings"
     compileSdk = 36
 
     defaultConfig {
@@ -31,7 +32,7 @@ kotlin {
 }
 
 dependencies {
-    api(project(":core"))
+    api(project(":storyrings-core"))
     val compose = platform("androidx.compose:compose-bom:2025.06.00")
     implementation(compose)
     implementation("androidx.compose.ui:ui")
@@ -43,4 +44,25 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.8.0")
 
     testImplementation("junit:junit:4.13.2")
+}
+
+mavenPublishing {
+    // Android's Javadoc generation fails on this code, so an empty Javadoc jar is added below instead.
+    configure(
+        com.vanniktech.maven.publish.AndroidSingleVariantLibrary(
+            variant = "release",
+            sourcesJar = true,
+            publishJavadocJar = false,
+        ),
+    )
+    pom {
+        name.set("StoryRings")
+        description.set("Instagram-style stories for Android apps: a story bar and full-screen viewer (Jetpack Compose, with a View wrapper).")
+    }
+}
+
+// Maven Central requires a Javadoc jar; an empty one is accepted.
+val emptyJavadocJar by tasks.registering(Jar::class) { archiveClassifier.set("javadoc") }
+publishing {
+    publications.withType<MavenPublication>().configureEach { artifact(emptyJavadocJar) }
 }

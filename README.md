@@ -10,7 +10,7 @@ polls.
 | React | `npm install @lunasmedia/storyrings-react` | [docs/web-sdk.md#react](docs/web-sdk.md#react) |
 | React Native / Expo | `npx expo install @lunasmedia/storyrings-react-native react-native-video @react-native-async-storage/async-storage` | [docs/react-native-sdk.md](docs/react-native-sdk.md) |
 | iOS (SwiftUI / UIKit) | Swift Package Manager: `https://github.com/lunasmedia/storyrings` | [docs/ios-sdk.md](docs/ios-sdk.md) |
-| Android (Compose / Views) | Coming soon | [docs/android-sdk.md](docs/android-sdk.md) |
+| Android (Compose / Views) | Maven Central: `io.github.brad-jeancy:storyrings-android` (coming soon) | [docs/android-sdk.md](docs/android-sdk.md) |
 | Flutter | Coming soon | [docs/flutter-sdk.md](docs/flutter-sdk.md) |
 
 Each app or website gets a public token (`pk_live_…`) in the dashboard under

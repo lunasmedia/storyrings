@@ -3,7 +3,7 @@ import Foundation
 import UIKit
 
 /// The SDK version, sent with analytics as `ios@<version>`.
-public let storiesSDKVersion = "0.1.0"
+public let storiesSDKVersion = "0.1.1"
 
 /// Loads feeds and holds per-app state (seen stories, analytics) shared by every story bar,
 /// like the other SDKs' clients. Use it from the main thread.

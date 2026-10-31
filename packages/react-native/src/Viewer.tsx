@@ -1169,7 +1169,8 @@ const s_ = StyleSheet.create({
   },
   fill: { height: '100%', backgroundColor: '#fff' },
   running: { width: '100%', transformOrigin: 'left' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  // 16pt in from the edge (with top's 8), clear of the screen's rounded corners.
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, paddingLeft: 8 },
   avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#333' },
   name: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '600' },
   btn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

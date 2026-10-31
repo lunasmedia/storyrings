@@ -16,7 +16,7 @@ import { AppState, type NativeEventSubscription, Platform } from 'react-native';
 import { defaultStorage, hasPersistentStorage } from './optional';
 import { startsNewSession } from './session';
 
-export const SDK_VERSION = '0.1.0';
+export const SDK_VERSION = '0.1.1';
 /** The hosted Stories API. Pass `apiUrl` to use your own server. */
 export const DEFAULT_API_URL = 'https://stories-dashboard.fly.dev';
 

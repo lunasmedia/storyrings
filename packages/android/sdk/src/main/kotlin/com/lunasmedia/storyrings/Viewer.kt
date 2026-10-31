@@ -513,7 +513,8 @@ private fun Header(controller: ViewerController, coverUrl: String, title: String
             }
         }
         Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // 16dp in from the edge, clear of the screen's rounded corners.
+        Row(Modifier.padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             RemoteImage(coverUrl, Modifier.size(32.dp).clip(CircleShape))
             Spacer(Modifier.width(8.dp))
             BasicText(

@@ -18,7 +18,7 @@ import com.lunasmedia.storyrings.core.normalizeFeedJson
 import java.net.URLEncoder
 
 /** The SDK version, sent with analytics as `android@<version>`. */
-const val STORIES_SDK_VERSION = "0.1.0"
+const val STORIES_SDK_VERSION = "0.1.1"
 
 /** One HTTP request; `done(status, body)` with status 0 for a network failure. */
 fun interface HttpClient {

@@ -618,42 +618,46 @@ class _StoriesViewerState extends State<StoriesViewer> with TickerProviderStateM
                   ),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    ClipOval(
-                      child: SizedBox(
-                        width: 32,
-                        height: 32,
-                        child: Image.network(g.coverUrl,
-                            fit: BoxFit.cover,
-                            excludeFromSemantics: true,
-                            errorBuilder: (_, __, ___) => const SizedBox()),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Semantics(
-                        header: true,
-                        child: Text(
-                          s.title ?? g.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                // 16 in from the edge, clear of the screen's rounded corners.
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: Row(
+                    children: [
+                      ClipOval(
+                        child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: Image.network(g.coverUrl,
+                              fit: BoxFit.cover,
+                              excludeFromSemantics: true,
+                              errorBuilder: (_, __, ___) => const SizedBox()),
                         ),
                       ),
-                    ),
-                    if (canShare)
-                      _iconButton(StoriesLabels.share, Icons.ios_share, () => unawaited(_share()), key: _shareKey),
-                    _iconButton(
-                      userPaused ? StoriesLabels.play : StoriesLabels.pause,
-                      userPaused ? Icons.play_arrow : Icons.pause,
-                      () => _setPaused(_PauseReason.user, !userPaused),
-                    ),
-                    if (s.type == 'video')
-                      _iconButton(_muted ? StoriesLabels.unmute : StoriesLabels.mute,
-                          _muted ? Icons.volume_off : Icons.volume_up, _toggleMute),
-                    _iconButton(StoriesLabels.close, Icons.close, _close),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Semantics(
+                          header: true,
+                          child: Text(
+                            s.title ?? g.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
+                        ),
+                      ),
+                      if (canShare)
+                        _iconButton(StoriesLabels.share, Icons.ios_share, () => unawaited(_share()), key: _shareKey),
+                      _iconButton(
+                        userPaused ? StoriesLabels.play : StoriesLabels.pause,
+                        userPaused ? Icons.play_arrow : Icons.pause,
+                        () => _setPaused(_PauseReason.user, !userPaused),
+                      ),
+                      if (s.type == 'video')
+                        _iconButton(_muted ? StoriesLabels.unmute : StoriesLabels.mute,
+                            _muted ? Icons.volume_off : Icons.volume_up, _toggleMute),
+                      _iconButton(StoriesLabels.close, Icons.close, _close),
+                    ],
+                  ),
                 ),
               ],
             ),

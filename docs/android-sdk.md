@@ -40,7 +40,7 @@ Local demo token (after `pnpm db:seed`): `pk_live_DemoMobileAppToken000000`
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("io.github.brad-jeancy:storyrings-android:0.1.0")
+    implementation("io.github.brad-jeancy:storyrings-android:0.1.1")
 }
 ```
 

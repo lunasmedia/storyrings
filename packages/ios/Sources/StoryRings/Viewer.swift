@@ -579,6 +579,8 @@ struct StoriesViewer: View {
                 }
                 iconButton(StoriesLabels.close, "xmark", action: model.close)
             }
+            // 16pt in from the edge, clear of the screen's rounded corners.
+            .padding(.leading, 6)
         }
         .padding(.horizontal, 10)
         .padding(.top, 8)

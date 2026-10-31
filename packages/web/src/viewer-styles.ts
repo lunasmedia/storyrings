@@ -17,7 +17,7 @@ export const VIEWER_CSS = `
 .progress{position:absolute;top:8px;left:8px;right:8px;display:flex;gap:4px;pointer-events:none}
 .seg{flex:1;height:2.5px;border-radius:2px;background:rgba(255,255,255,.4);overflow:hidden}
 .fill{height:100%;width:100%;background:#fff;transform-origin:left;transform:scaleX(0)}
-.header{position:absolute;top:18px;left:8px;right:4px;display:flex;align-items:center;gap:8px;z-index:2}
+.header{position:absolute;top:18px;left:16px;right:4px;display:flex;align-items:center;gap:8px;z-index:2}
 .avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;background:#333}
 .name{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 .btn{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;cursor:pointer;color:#fff}

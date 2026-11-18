@@ -110,6 +110,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -435,6 +436,14 @@ private fun StoryMedia(controller: ViewerController, story: FeedStory, seq: Int)
     val look = story.look
     Box(Modifier.fillMaxSize().background(gapBrush(look)))
     if (story.type == "video") {
+        // Its first frame (usually already loaded with the bar) until the video draws, so the
+        // story shows at once instead of the loading screen.
+        RemoteImage(
+            story.url,
+            Modifier.fillMaxSize(),
+            contentScale = if (look.fills) ContentScale.Crop else ContentScale.Fit,
+            videoFrame = true,
+        )
         VideoStory(controller, story.url, seq, look.fills)
         // A designed video's text and stickers, fitted as the story image would be.
         look.overlay?.let { overlay ->
@@ -450,12 +459,28 @@ private fun StoryMedia(controller: ViewerController, story: FeedStory, seq: Int)
     }
 }
 
+/** Video a story plays before starting (and again after running out). */
+private const val START_BUFFER_MS = 500
+
 @OptIn(UnstableApi::class)
 @Composable
 private fun VideoStory(controller: ViewerController, url: String, seq: Int, fills: Boolean) {
     val context = LocalContext.current
     val player = remember(url, seq) {
-        ExoPlayer.Builder(context).build().apply {
+        ExoPlayer.Builder(context)
+            // Starts after half a second of video instead of the default 2.5: stories are short,
+            // and media served from far away made opening one wait on the spinner.
+            .setLoadControl(
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                        DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                        START_BUFFER_MS,
+                        START_BUFFER_MS * 2,
+                    )
+                    .build(),
+            )
+            .build().apply {
             setMediaItem(MediaItem.fromUri(url))
             var ready = false
             addListener(object : Player.Listener {

@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../stories_core.dart';
 
-const sdkVersion = '0.1.0';
+const sdkVersion = '0.1.1';
 
 /// Persists in SharedPreferences (UserDefaults on iOS, SharedPreferences on Android).
 class SharedPreferencesStorage implements KeyValueStorage {

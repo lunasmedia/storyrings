@@ -11,6 +11,7 @@ export type {
 export * from './analytics';
 export * from './api';
 export * from './display';
+export * from './energized';
 export * from './gestures';
 export * from './interactions';
 export * from './machine';

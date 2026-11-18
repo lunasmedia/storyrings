@@ -63,6 +63,11 @@ export interface FeedStoryDto {
    * (`fit`). Absent: nothing to draw.
    */
   overlay?: string;
+  /**
+   * Videos: a JPEG of the first frame, to show while the video loads, so the story opens on its
+   * picture at once. Absent from older servers and for videos whose frame couldn't be read.
+   */
+  poster?: string;
 }
 
 export type StoryFit = 'fill' | 'fit';

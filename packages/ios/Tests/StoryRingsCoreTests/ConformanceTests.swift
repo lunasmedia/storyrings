@@ -30,6 +30,7 @@ final class ConformanceTests: XCTestCase {
     func testConstantsMatchSpec() throws {
         let c = try readJSON(specURL.appendingPathComponent("constants.json")) as! [String: Any]
         XCTAssertEqual(c["viewableMs"] as? [String: Int], ["image": Viewable.imageMs, "video": Viewable.videoMs])
+        XCTAssertEqual(c["energizedPreviewMs"] as? Int, energizedPreviewMs)
         XCTAssertEqual(c["tapMaxMs"] as? Int, Gestures.tapMaxMs)
         XCTAssertEqual(c["sessionTimeoutMs"] as? Int, Sessions.timeoutMs)
         XCTAssertEqual(c["viewerIdMaxAgeMs"] as? Int, Sessions.viewerIdMaxAgeMs)
@@ -88,6 +89,7 @@ final class ConformanceTests: XCTestCase {
     func testSessions() throws { try run("sessions") }
     func testInteractions() throws { try run("interactions") }
     func testDisplay() throws { try run("display") }
+    func testEnergized() throws { try run("energized") }
 
     private func caseFiles() throws -> [URL] {
         try FileManager.default.contentsOfDirectory(at: specURL.appendingPathComponent("cases"), includingPropertiesForKeys: nil)
@@ -117,7 +119,30 @@ private let suites: [String: Adapter] = [
     "viewer": viewer, "feed": feed, "tags": tags, "links": links, "gestures": gestures,
     "seen": seen, "analytics": analytics, "sessions": sessions, "interactions": interactions,
     "display": { StoryLook(json: $0["story"] as! [String: Any]).json },
+    "energized": energized,
 ]
+
+// MARK: energized
+
+private func energized(_ input: [String: Any]) -> Any {
+    if input["op"] as? String == "isEnergized" {
+        return ["energized": BarLayout.resolve(input["layout"]).isEnergized]
+    }
+    // Seen stories make no difference: it's always the first.
+    let toGroups = { (any: Any?) in (any as! [[Any]]).map { $0.map { $0 as! String } } }
+    let cycle = EnergizedCycle(groups: toGroups(input["groups"]))
+    let steps: [Any] = (input["steps"] as! [[Any]]).map { step in
+        switch step[0] as! String {
+        case "visible": cycle.setVisible((step[1] as! [NSNumber]).map(\.intValue))
+        case "tick": cycle.tick((step[1] as! NSNumber).intValue)
+        case "markSeen": break
+        case "groups": cycle.setGroups(toGroups(step[1]))
+        default: fatalError("energized: unknown step \(step[0])")
+        }
+        return ["current": cycle.current?.json ?? NSNull(), "remainingMs": cycle.remainingMs]
+    }
+    return ["steps": steps]
+}
 
 // MARK: interactions
 

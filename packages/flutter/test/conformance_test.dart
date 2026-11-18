@@ -19,6 +19,7 @@ void main() {
     final c = jsonDecode(File('${_spec.path}/constants.json').readAsStringSync()) as Map;
     expect(c['viewableMs'], {'image': viewableMs.image, 'video': viewableMs.video});
     expect(c['tapMaxMs'], tapMaxMs);
+    expect(c['energizedPreviewMs'], energizedPreviewMs);
     expect(c['sessionTimeoutMs'], sessionTimeoutMs);
     expect(c['viewerIdMaxAgeMs'], viewerIdMaxAgeMs);
     expect(c['seenMaxIds'], seenMaxIds);
@@ -87,7 +88,36 @@ final Map<String, _Suite> _suites = {
   'sessions': _sessions,
   'interactions': _interactions,
   'display': (input) async => StoryLook.fromJson(input['story'] as Map).toJson(),
+  'energized': _energized,
 };
+
+Future<Object?> _energized(Map<String, dynamic> input) async {
+  if (input['op'] == 'isEnergized') return {'energized': BarLayout.resolve(input['layout']).isEnergized};
+  // Seen stories make no difference: it's always the first.
+  List<GroupLike> groups(Object? lists) => [
+        for (final (i, ids) in (lists as List).indexed)
+          GroupLike(id: 'g$i', stories: [for (final id in ids as List) StoryLike(id: id as String, durationMs: 1)]),
+      ];
+  final cycle = EnergizedCycle(groups(input['groups']));
+  final steps = <Object?>[];
+  for (final raw in input['steps'] as List) {
+    final step = raw as List;
+    switch (step[0]) {
+      case 'visible':
+        cycle.setVisible([for (final i in step[1] as List) (i as num).toInt()]);
+      case 'tick':
+        cycle.tick((step[1] as num).toInt());
+      case 'markSeen':
+        break;
+      case 'groups':
+        cycle.setGroups(groups(step[1]));
+      default:
+        throw StateError('energized: unknown step ${step[0]}');
+    }
+    steps.add({'current': cycle.current?.toJson(), 'remainingMs': cycle.remainingMs});
+  }
+  return {'steps': steps};
+}
 
 Future<Object?> _interactions(Map<String, dynamic> input) async {
   double r3(double v) => (v * 1000).round() / 1000;

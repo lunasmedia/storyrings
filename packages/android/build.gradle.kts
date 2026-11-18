@@ -8,7 +8,7 @@ plugins {
 
 allprojects {
     group = "io.github.brad-jeancy"
-    version = "0.1.1"
+    version = "0.1.2"
 }
 
 // Maven Central: ./gradlew publishToMavenCentral (see README.md). Both modules share this POM.

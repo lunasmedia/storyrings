@@ -3,6 +3,7 @@
     "image": 1000,
     "video": 2000
   },
+  "energizedPreviewMs": 7000,
   "tapMaxMs": 250,
   "sessionTimeoutMs": 1800000,
   "viewerIdMaxAgeMs": 34128000000,

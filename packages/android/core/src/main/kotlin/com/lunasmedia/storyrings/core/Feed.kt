@@ -11,10 +11,24 @@ import kotlin.math.roundToInt
 class StoriesException(val code: String, message: String, val status: Int? = null) : Exception(message)
 
 /** Shape and size of every item in the bar, from the dashboard. `corner`: % of the shorter side (50 = circle). */
-data class BarLayout(val width: Int, val height: Int, val corner: Int, val gap: Int) {
+data class BarLayout(
+    val width: Int,
+    val height: Int,
+    val corner: Int,
+    val gap: Int,
+    /** "energized" previews stories inside the cards (vertical cards only); null = static. */
+    val motion: String? = null,
+) {
     val cornerRadius: Double get() = minOf(width, height) * corner / 100.0
 
-    fun toJson(): Map<String, Any?> = linkedMapOf("width" to width, "height" to height, "corner" to corner, "gap" to gap)
+    /** Vertical thumbnails: cards taller than they are wide. */
+    val isVertical: Boolean get() = height > width
+
+    /** The Energized style (spec/cases/energized.json): it needs vertical cards. */
+    val isEnergized: Boolean get() = motion == "energized" && isVertical
+
+    fun toJson(): Map<String, Any?> = linkedMapOf<String, Any?>("width" to width, "height" to height, "corner" to corner, "gap" to gap)
+        .also { if (motion != null) it["motion"] = motion }
 
     companion object {
         val DEFAULTS = BarLayout(width = 68, height = 68, corner = 50, gap = 14)
@@ -22,7 +36,7 @@ data class BarLayout(val width: Int, val height: Int, val corner: Int, val gap: 
 
         /** Fills in and clamps a layout; unknown or invalid values fall back to the defaults. */
         fun resolve(input: Any?): BarLayout {
-            val out = DEFAULTS.toJson().mapValues { (it.value as Int) }.toMutableMap()
+            val out = mutableMapOf("width" to DEFAULTS.width, "height" to DEFAULTS.height, "corner" to DEFAULTS.corner, "gap" to DEFAULTS.gap)
             val map = input.asObject()
             if (map != null) {
                 for ((key, range) in limits) {
@@ -31,7 +45,8 @@ data class BarLayout(val width: Int, val height: Int, val corner: Int, val gap: 
                     out[key] = v.coerceIn(range.first, range.second).roundToInt()
                 }
             }
-            return BarLayout(out["width"]!!, out["height"]!!, out["corner"]!!, out["gap"]!!)
+            val motion = if (map?.get("motion") == "energized") "energized" else null
+            return BarLayout(out["width"]!!, out["height"]!!, out["corner"]!!, out["gap"]!!, motion)
         }
     }
 }

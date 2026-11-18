@@ -1,6 +1,6 @@
 {
   "name": "@lunasmedia/storyrings-react",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "React component for Stories: <StoriesBar token=\"\u2026\" />",
   "license": "MIT",
   "keywords": [

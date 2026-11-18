@@ -1,8 +1,11 @@
 package com.lunasmedia.storyrings
 
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +29,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -35,6 +39,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.lunasmedia.storyrings.core.CloseReason
+import com.lunasmedia.storyrings.core.EnergizedCycle
+import com.lunasmedia.storyrings.core.EnergizedPreview
 import com.lunasmedia.storyrings.core.Feed
 import com.lunasmedia.storyrings.core.FeedGroup
 import com.lunasmedia.storyrings.core.KeyValueStorage
@@ -43,9 +49,13 @@ import com.lunasmedia.storyrings.core.StoriesException
 import com.lunasmedia.storyrings.core.StoriesLabels
 import com.lunasmedia.storyrings.core.StoryEvent
 import com.lunasmedia.storyrings.core.normalizeTags
+import kotlin.math.abs
 
 /** Viewability: how long a circle must stay at least half on screen to count as an impression. */
 private const val IMPRESSION_MS = 1000L
+
+/** Energized style: wait for scrolling to settle before starting again from the first visible card. */
+private const val ENERGIZED_SETTLE_MS = 150L
 
 /** Longest the bar stays hidden on launch while waiting for the live feed and covers. */
 private const val REVEAL_WAIT_MS = 500L
@@ -120,16 +130,43 @@ internal class BarState(private val client: StoriesClient, val config: BarConfig
     private val revealTask = Runnable { reveal() }
     var appActive = true
         set(value) {
+            tickEnergized()
             field = value
             // Offline at launch: try again when the app comes back.
             if (value && !failed && !fresh) load(force = true)
             reportImpressions()
+            syncEnergized()
         }
 
     // Circles' bounds in the window and their corner radius (px), for the zoom transition.
     private val circles = HashMap<String, Rect>()
     var cornerPx = 0f
     var transition = StoriesTransition.SLIDE
+
+    // Energized style
+    /** The card previewing a story now. */
+    var energized by mutableStateOf<EnergizedPreview?>(null)
+        private set
+    /**
+     * Energized style: the card that was previewing when the viewer opened from the bar. Its
+     * circle stays aside (as while it previewed) instead of coming back as the viewer opens.
+     */
+    var heldIndex by mutableStateOf<Int?>(null)
+        private set
+    private var cycle: EnergizedCycle? = null
+    private var cycleGroups: List<List<String>> = emptyList()
+    private var lastTick = 0L
+    private var animationsOff = false
+    private val fully = HashMap<String, Boolean>()
+    /** The bar is scrolling a card into view for its turn: what's visible is still moving. */
+    private var energizedScrolling = false
+    private val energizedSettle = Runnable {
+        if (energizedScrolling) return@Runnable
+        tickEnergized()
+        cycle?.setVisible(fullyVisible())
+        updateEnergized()
+    }
+    private val energizedNext = Runnable { updateEnergized() }
 
     // Impressions
     private var frames = HashMap<String, Rect>()
@@ -157,11 +194,18 @@ internal class BarState(private val client: StoriesClient, val config: BarConfig
         handler.removeCallbacks(revealTask)
         pending.values.forEach(handler::removeCallbacks)
         pending.clear()
+        handler.removeCallbacks(energizedSettle)
+        handler.removeCallbacks(energizedNext)
+        cycle = null
+        energized = null
     }
 
     private fun reveal() {
         visible = true
-        handler.post { reportImpressions() }
+        handler.post {
+            reportImpressions()
+            syncEnergized()
+        }
     }
 
     fun load(force: Boolean = false) {
@@ -199,14 +243,22 @@ internal class BarState(private val client: StoriesClient, val config: BarConfig
     private fun preloadFirstStories(feed: Feed, seen: SeenStore) {
         for (group in feed.groups.take(PRELOAD_GROUPS)) {
             val first = group.stories.getOrNull(seen.firstUnseenIndex(group.storyIds)) ?: continue
-            if (first.type == "image") ImageCache.load(first.url) {}
+            // A video's first frame shows in the viewer while the video loads.
+            if (first.type == "video") ImageCache.loadFrame(first.url) {} else ImageCache.load(first.url) {}
         }
     }
 
+    /**
+     * Loads the first covers before the bar appears, so they don't pop in; with the Energized
+     * style, also each card's still (its first story: the photo, or a video's first frame), so
+     * cards don't show their cover first and then change to the still.
+     */
     private fun preloadCovers(feed: Feed, done: () -> Unit) {
-        val urls = feed.groups.take(8).map { it.coverUrl }.filter { it.isNotEmpty() }
+        val groups = feed.groups.take(8)
+        val covers = groups.map { it.coverUrl }.filter { it.isNotEmpty() }
+        val stills = if (feed.layout?.isEnergized == true) groups.mapNotNull { it.stories.firstOrNull() } else emptyList()
         var finished = false
-        var remaining = urls.size
+        var remaining = covers.size + stills.size
         val finish = {
             if (!finished) {
                 finished = true
@@ -215,15 +267,87 @@ internal class BarState(private val client: StoriesClient, val config: BarConfig
         }
         if (remaining == 0) return finish()
         handler.postDelayed({ finish() }, REVEAL_WAIT_MS)
-        // A missing cover just shows the placeholder; nothing to report.
-        urls.forEach { url -> ImageCache.load(url) { if (--remaining == 0) finish() } }
+        // A missing cover or still just shows the placeholder; nothing to report.
+        val loaded: (Bitmap?) -> Unit = { if (--remaining == 0) finish() }
+        covers.forEach { ImageCache.load(it, loaded) }
+        stills.forEach { if (it.type == "video") ImageCache.loadFrame(it.url, loaded) else ImageCache.load(it.url, loaded) }
     }
 
     fun track(event: StoryEvent) = client.track(if (config.bar.isEmpty()) event else event.withBar(config.bar))
 
-    fun updateFrame(id: String, bounds: Rect) {
+    /** [fullyShown]: the whole card is on screen (its visible bounds are its full size). */
+    fun updateFrame(id: String, bounds: Rect, fullyShown: Boolean) {
         frames[id] = bounds
         reportImpressions()
+        if (fully[id] != fullyShown) {
+            fully[id] = fullyShown
+            if (cycle != null) {
+                // Once scrolling settles, start again from the first visible card.
+                handler.removeCallbacks(energizedSettle)
+                handler.postDelayed(energizedSettle, ENERGIZED_SETTLE_MS)
+            }
+        }
+    }
+
+    // --- Energized style: vertical cards preview stories in place, one group at a time, each
+    // scrolled into view for its turn (spec/cases/energized.json). Previews send no analytics and mark nothing seen.
+
+    private val energizedRunning get() = cycle != null && visible && viewer == null && appActive
+
+    /** Keeps the cycle in step with the feed, the settings and what covers the bar. */
+    fun syncEnergized(animationsOff: Boolean = this.animationsOff) {
+        this.animationsOff = animationsOff
+        val feed = feed
+        if (feed?.layout?.isEnergized != true || animationsOff) {
+            tickEnergized()
+            cycle = null
+            cycleGroups = emptyList()
+            updateEnergized()
+            return
+        }
+        val groups = feed.groups.map { it.storyIds }
+        val current = cycle
+        if (current == null) {
+            cycle = EnergizedCycle(groups).also { it.setVisible(fullyVisible()) }
+            cycleGroups = groups
+            lastTick = 0L
+        } else if (groups != cycleGroups) {
+            tickEnergized()
+            current.setGroups(groups)
+            cycleGroups = groups
+        }
+        updateEnergized()
+    }
+
+    /** Wraps the bar scrolling a card into view for its turn; checks what's visible after. */
+    suspend fun scrollingForTurn(scroll: suspend () -> Unit) {
+        energizedScrolling = true
+        try {
+            scroll()
+        } finally {
+            energizedScrolling = false
+            handler.removeCallbacks(energizedSettle)
+            handler.postDelayed(energizedSettle, ENERGIZED_SETTLE_MS)
+        }
+    }
+
+    private fun fullyVisible(): List<Int> =
+        feed?.groups?.indices?.filter { fully[feed!!.groups[it].id] == true }.orEmpty()
+
+    /** Moves the cycle on by the time played since the last tick. */
+    private fun tickEnergized() {
+        val now = SystemClock.uptimeMillis()
+        if (lastTick != 0L && energizedRunning) cycle?.tick((now - lastTick).toInt())
+        lastTick = if (energizedRunning) now else 0L
+    }
+
+    private fun updateEnergized() {
+        tickEnergized()
+        handler.removeCallbacks(energizedNext)
+        val current = if (energizedRunning) cycle?.current else null
+        if (current != energized) energized = current
+        val cycle = cycle ?: return
+        if (current != null) handler.postDelayed(energizedNext, cycle.remainingMs.toLong())
     }
 
     fun updateCircle(id: String, bounds: Rect) {
@@ -300,12 +424,15 @@ internal class BarState(private val client: StoriesClient, val config: BarConfig
             if (!opening) return@Runnable
             opening = false
             openingIndex = null
+            tickEnergized()
+            heldIndex = energized?.groupIndex
             viewer = ViewerController(
                 feed, index, seen, ::track, callbacks.viewer,
                 answers = client.answerStore(feed.appId),
                 sendAnswer = client::sendAnswer,
             )
             reportImpressions()
+            syncEnergized()
         }
         opening = true
         if (first == null || first.type != "image" || ImageCache.cached(first.url) != null) return show.run()
@@ -319,6 +446,8 @@ internal class BarState(private val client: StoriesClient, val config: BarConfig
 
     fun viewerFinished(reason: CloseReason) {
         viewer = null
+        syncEnergized()
+        heldIndex = null
         // Rings turn grey for what was just watched.
         seenVersion++
         callbacks.onClose?.invoke(reason)
@@ -412,14 +541,40 @@ fun StoriesBar(
     val radius = layout?.cornerRadius?.dp ?: (theme.circleSize / 2)
     val gap = layout?.gap?.dp ?: theme.gap
     state.cornerPx = with(LocalDensity.current) { radius.toPx() }
+    // Energized style (off when the system's animations are off).
+    val animationsOff = context.animationsOff()
+    LaunchedEffect(state, feed, seen, animationsOff) { state.syncEnergized(animationsOff) }
+    val preview = state.energized
+    // Energized style: story cards with the circle in the middle.
+    val cards = layout?.isEnergized == true
     // Read, so rings redraw when the viewer closes.
     state.seenVersion
+    // Energized style: each card scrolls into view for its turn (the least scroll that shows all
+    // of it), so the turns go through every group. Where the bar and each card are in the window.
+    val scroll = rememberScrollState()
+    val barSpan = remember { floatArrayOf(0f, 0f) }
+    val itemSpans = remember { HashMap<String, Pair<Float, Float>>() }
+    LaunchedEffect(preview?.turn) {
+        val p = preview ?: return@LaunchedEffect
+        val (left, right) = itemSpans[feed.groups.getOrNull(p.groupIndex)?.id] ?: return@LaunchedEffect
+        val delta = when {
+            left < barSpan[0] -> left - barSpan[0]
+            right > barSpan[1] -> right - barSpan[1]
+            else -> 0f
+        }
+        if (abs(delta) >= 1f) state.scrollingForTurn { scroll.animateScrollBy(delta) }
+    }
     Row(
         modifier
             .alpha(if (state.visible) 1f else 0f)
-            .onGloballyPositioned { state.updateViewport(it.boundsInWindow()) }
+            .onGloballyPositioned {
+                val bounds = it.boundsInWindow()
+                barSpan[0] = bounds.left
+                barSpan[1] = bounds.right
+                state.updateViewport(bounds)
+            }
             .semantics { contentDescription = StoriesLabels.BAR }
-            .horizontalScroll(rememberScrollState())
+            .horizontalScroll(scroll)
             .padding(start = theme.barPadding, end = theme.barPadding, top = 4.dp, bottom = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(gap),
         verticalAlignment = Alignment.Top,
@@ -434,10 +589,22 @@ fun StoriesBar(
                 theme = theme,
                 textColor = textColor,
                 opening = state.openingIndex == index,
+                held = state.heldIndex == index,
                 onTap = { state.open(index) },
-                modifier = Modifier.onGloballyPositioned { state.updateFrame(group.id, it.boundsInWindow()) },
+                modifier = Modifier.onGloballyPositioned {
+                    val x = it.positionInWindow().x
+                    itemSpans[group.id] = x to x + it.size.width
+                    val bounds = it.boundsInWindow()
+                    // Visible bounds are clipped by the scrolling row and the window.
+                    val whole = bounds.width >= it.size.width - 1 && bounds.height >= it.size.height - 1
+                    state.updateFrame(group.id, bounds, whole)
+                },
                 onCircleBounds = { state.updateCircle(group.id, it) },
+                card = cards,
+                preview = preview?.takeIf { it.groupIndex == index }?.let { group.stories.getOrNull(it.storyIndex) },
+                previewTurn = preview?.turn ?: 0,
             )
         }
     }
 }
+

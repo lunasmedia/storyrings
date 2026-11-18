@@ -3,6 +3,7 @@ package com.lunasmedia.storyrings
 import android.graphics.Matrix
 import androidx.annotation.OptIn
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -17,6 +18,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -26,7 +30,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -67,13 +73,22 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.lunasmedia.storyrings.core.FeedGroup
+import com.lunasmedia.storyrings.core.FeedStory
 import com.lunasmedia.storyrings.core.RingStyle
 import com.lunasmedia.storyrings.core.StoriesLabels
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
 
-/** One item in the story bar: cover, ring, badge and title, in the dashboard's style. */
+/** Energized cards: the circle in the middle is this share of the card's width. */
+internal const val ENERGIZED_AVATAR_SHARE = 0.5f
+
+/**
+ * One item in the story bar: cover, ring, badge and title, in the dashboard's style. With [card]
+ * (the Energized style) it's a story-shaped card instead: showing a still of the group's first
+ * story (which plays as [preview] on its turn; the cover until the still loads), the circle in the middle (hidden while the story shows) and the title
+ * inside.
+ */
 @Composable
 internal fun StoryCircle(
     group: FeedGroup,
@@ -89,16 +104,19 @@ internal fun StoryCircle(
     onCircleBounds: ((Rect) -> Unit)? = null,
     /** Its viewer is opening (waiting for the first story): shown pressed. */
     opening: Boolean = false,
+    /**
+     * Energized style: its viewer is open, opened while this card previewed: the circle stays
+     * aside until the preview shows again (or moves on to another card).
+     */
+    held: Boolean = false,
+    /** Energized style: drawn as a story card; false = a circle. */
+    card: Boolean = false,
+    /** Energized style: the story previewing in this card now, if any. */
+    preview: FeedStory? = null,
+    /** Changes each time a preview starts, so the same story starts again. */
+    previewTurn: Int = 0,
 ) {
     val a = group.appearance
-    val ring = a.ring
-    val reduceMotion = LocalContext.current.animationsOff()
-    val animates = ring.style != "none" && ring.animation != "none" && !(seen && ring.animateOnlyUnseen) && !reduceMotion
-    val ringWidth = if (ring.style == "none") 0.dp else ring.width.dp
-    val inset = ringWidth + if (ring.style == "none") 0.dp else ring.gap.dp
-    val innerRadius = max(0f, (radius - inset).value).dp
-    val label = a.badgeLabel(group.endsAtMs)
-
     Column(
         // Items are wider than the ring by the title allowance, like the other SDKs.
         modifier = modifier
@@ -110,46 +128,13 @@ internal fun StoryCircle(
             },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Dimmed while its viewer is opening (waiting for the first story).
-        Box(
-            Modifier
-                .size(width, height)
-                .alpha(if (opening) 0.7f else 1f)
-                .onGloballyPositioned { onCircleBounds?.invoke(it.boundsInWindow()) },
-        ) {
-            if (ring.style != "none" && ring.gapColor != "background" && ring.gapColor != "transparent") {
-                Box(
-                    Modifier
-                        .padding(ringWidth)
-                        .fillMaxSize()
-                        .background(parseHex(ring.gapColor, Color.Transparent), RoundedCornerShape(max(0f, (radius - ringWidth).value).dp)),
-                )
-            }
-            Box(
-                Modifier
-                    .padding(inset)
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(innerRadius))
-                    .background(Color(0xFFE5E5EA)),
-            ) {
-                if (group.coverUrl.isNotEmpty()) RemoteImage(group.coverUrl, Modifier.fillMaxSize())
-                val video = group.coverVideoUrl
-                if (video != null && !reduceMotion) CoverVideo(video)
-            }
-            if (ring.style != "none") {
-                val t = if (animates) {
-                    val duration = ringSpeedMs[ring.speed] ?: 2400
-                    val transition = rememberInfiniteTransition(label = "ring")
-                    transition.animateFloat(
-                        0f, 1f, infiniteRepeatable(tween(duration, easing = LinearEasing), RepeatMode.Restart), label = "phase",
-                    ).value
-                } else {
-                    0f
-                }
-                Canvas(Modifier.fillMaxSize()) { drawRing(ring, seen, radius.toPx(), t) }
-            }
-            if (label != null) Badge(label, group, Modifier.align(if (a.badge.position == "top-right") Alignment.TopEnd else Alignment.BottomCenter))
+        val bounds = Modifier.onGloballyPositioned { onCircleBounds?.invoke(it.boundsInWindow()) }
+        if (card) {
+            EnergizedCard(group, width, height, radius, seen, theme, preview, previewTurn, held, bounds.alpha(if (opening) 0.7f else 1f))
+            return@Column
         }
+        // Dimmed while its viewer is opening (waiting for the first story).
+        CircleArt(group, width, height, radius, seen, bounds.alpha(if (opening) 0.7f else 1f))
         if (!a.title.hidden && !theme.hideTitles) {
             Spacer(Modifier.height(6.dp))
             val color = if (a.title.color == "inherit") textColor else parseHex(a.title.color, textColor)
@@ -165,6 +150,127 @@ internal fun StoryCircle(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+@Composable
+private fun EnergizedCard(
+    group: FeedGroup,
+    width: Dp,
+    height: Dp,
+    radius: Dp,
+    seen: Boolean,
+    theme: StoriesTheme,
+    preview: FeedStory?,
+    previewTurn: Int,
+    held: Boolean,
+    modifier: Modifier,
+) {
+    val a = group.appearance
+    val avatar = width * ENERGIZED_AVATAR_SHARE
+    Box(
+        modifier
+            .size(width, height)
+            .clip(RoundedCornerShape(radius))
+            .background(Color(0xFF222222)),
+    ) {
+        // A still of the group's first story (the one it previews): the image, or a video's first
+        // frame. The cover fills the card only if there's no still to show: shown while the still
+        // loads, it would flash up and then change.
+        var stillFailed by remember(group.id) { mutableStateOf(false) }
+        val first = group.stories.firstOrNull()
+        if (first != null && !stillFailed) {
+            RemoteImage(first.url, Modifier.fillMaxSize(), videoFrame = first.type == "video") { ok -> if (!ok) stillFailed = true }
+        } else if (group.coverUrl.isNotEmpty()) {
+            RemoteImage(group.coverUrl, Modifier.fillMaxSize())
+        }
+        // The circle (and its badge) gives way to the story while it shows, and stays aside while
+        // the viewer opened from that preview is open (until the preview shows again).
+        var shownTurn by remember { mutableStateOf<Int?>(null) }
+        var keepAside by remember { mutableStateOf(false) }
+        LaunchedEffect(held, preview == null) {
+            if (held) keepAside = true else if (preview == null) keepAside = false
+        }
+        if (preview != null) {
+            key(previewTurn) {
+                StoryPreview(preview) {
+                    shownTurn = previewTurn
+                    keepAside = false
+                }
+            }
+        }
+        val aside = (preview != null && shownTurn == previewTurn) || held || keepAside
+        val circleAlpha by animateFloatAsState(if (aside) 0f else 1f, tween(300), label = "circle")
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .fillMaxHeight(0.45f)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)))),
+        )
+        CircleArt(group, avatar, avatar, avatar / 2, seen, Modifier.align(Alignment.Center).alpha(circleAlpha))
+        if (!a.title.hidden && !theme.hideTitles) {
+            BasicText(
+                group.title,
+                style = theme.titleStyle.copy(
+                    fontSize = theme.titleSize,
+                    color = Color.White,
+                    fontWeight = FontWeight(a.title.weight.coerceIn(100, 900)),
+                    textAlign = TextAlign.Center,
+                    shadow = Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, 2f), 6f),
+                ),
+                maxLines = maxOf(1, a.title.maxLines),
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 6.dp, end = 6.dp, bottom = 8.dp),
+            )
+        }
+    }
+}
+
+/** The circle: cover, ring (style, animation, seen colour) and badge. */
+@Composable
+private fun CircleArt(group: FeedGroup, width: Dp, height: Dp, radius: Dp, seen: Boolean, modifier: Modifier) {
+    val a = group.appearance
+    val ring = a.ring
+    val reduceMotion = LocalContext.current.animationsOff()
+    val animates = ring.style != "none" && ring.animation != "none" && !(seen && ring.animateOnlyUnseen) && !reduceMotion
+    val ringWidth = if (ring.style == "none") 0.dp else ring.width.dp
+    val inset = ringWidth + if (ring.style == "none") 0.dp else ring.gap.dp
+    val innerRadius = max(0f, (radius - inset).value).dp
+    val label = a.badgeLabel(group.endsAtMs)
+    Box(modifier.size(width, height)) {
+        if (ring.style != "none" && ring.gapColor != "background" && ring.gapColor != "transparent") {
+            Box(
+                Modifier
+                    .padding(ringWidth)
+                    .fillMaxSize()
+                    .background(parseHex(ring.gapColor, Color.Transparent), RoundedCornerShape(max(0f, (radius - ringWidth).value).dp)),
+            )
+        }
+        Box(
+            Modifier
+                .padding(inset)
+                .fillMaxSize()
+                .clip(RoundedCornerShape(innerRadius))
+                .background(Color(0xFFE5E5EA)),
+        ) {
+            if (group.coverUrl.isNotEmpty()) RemoteImage(group.coverUrl, Modifier.fillMaxSize())
+            val video = group.coverVideoUrl
+            if (video != null && !reduceMotion) CoverVideo(video)
+        }
+        if (ring.style != "none") {
+            val t = if (animates) {
+                val duration = ringSpeedMs[ring.speed] ?: 2400
+                val transition = rememberInfiniteTransition(label = "ring")
+                transition.animateFloat(
+                    0f, 1f, infiniteRepeatable(tween(duration, easing = LinearEasing), RepeatMode.Restart), label = "phase",
+                ).value
+            } else {
+                0f
+            }
+            Canvas(Modifier.fillMaxSize()) { drawRing(ring, seen, radius.toPx(), t) }
+        }
+        if (label != null) Badge(label, group, Modifier.align(if (a.badge.position == "top-right") Alignment.TopEnd else Alignment.BottomCenter))
     }
 }
 

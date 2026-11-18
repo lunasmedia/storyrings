@@ -18,7 +18,7 @@ class StoriesException implements Exception {
 
 /// Shape and size of every item in the bar, from the dashboard.
 class BarLayout {
-  const BarLayout({required this.width, required this.height, required this.corner, required this.gap});
+  const BarLayout({required this.width, required this.height, required this.corner, required this.gap, this.motion});
   final int width;
   final int height;
 
@@ -26,16 +26,26 @@ class BarLayout {
   final int corner;
   final int gap;
 
+  /// 'energized' previews stories inside the cards (vertical cards only); null = static.
+  final String? motion;
+
   double get cornerRadius => (width < height ? width : height) * corner / 100;
 
-  Map<String, int> toJson() => {'width': width, 'height': height, 'corner': corner, 'gap': gap};
+  /// Vertical thumbnails: cards taller than they are wide.
+  bool get isVertical => height > width;
+
+  /// The Energized style (spec/cases/energized.json): it needs vertical cards.
+  bool get isEnergized => motion == 'energized' && isVertical;
+
+  Map<String, Object> toJson() =>
+      {'width': width, 'height': height, 'corner': corner, 'gap': gap, if (motion != null) 'motion': motion!};
 
   static const defaults = BarLayout(width: 68, height: 68, corner: 50, gap: 14);
   static const _limits = {'width': (40, 160), 'height': (40, 240), 'corner': (0, 50), 'gap': (0, 48)};
 
   /// Fills in and clamps a layout; unknown or invalid values fall back to the defaults.
   static BarLayout resolve(Object? input) {
-    final out = defaults.toJson();
+    final out = {'width': defaults.width, 'height': defaults.height, 'corner': defaults.corner, 'gap': defaults.gap};
     if (input is Map) {
       for (final MapEntry(key: key, value: (min, max)) in _limits.entries) {
         final v = input[key];
@@ -43,7 +53,13 @@ class BarLayout {
         out[key] = v.clamp(min, max).round();
       }
     }
-    return BarLayout(width: out['width']!, height: out['height']!, corner: out['corner']!, gap: out['gap']!);
+    return BarLayout(
+      width: out['width']!,
+      height: out['height']!,
+      corner: out['corner']!,
+      gap: out['gap']!,
+      motion: input is Map && input['motion'] == 'energized' ? 'energized' : null,
+    );
   }
 }
 

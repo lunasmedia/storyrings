@@ -3,6 +3,7 @@ import {
   type AnswerStore,
   type FeedDto,
   type FeedGroupDto,
+  isEnergized,
   labels,
   resolveTheme,
   type SeenStore,
@@ -35,7 +36,15 @@ import {
 } from 'react-native';
 import { Circle } from './Circle';
 import { getClient, type StoriesClientOptions } from './client';
-import { badgeSpeech, barMetrics, themeAppearance, visibleItems } from './layout';
+import { EnergizedCard, useEnergized } from './energized';
+import {
+  badgeSpeech,
+  barMetrics,
+  fullyVisibleItems,
+  offsetToShow,
+  themeAppearance,
+  visibleItems,
+} from './layout';
 import { type CircleRect, type StoriesTransition, Viewer, type ViewerCallbacks } from './Viewer';
 
 export interface StoriesBarProps extends StoriesClientOptions, ViewerCallbacks {
@@ -89,7 +98,9 @@ const PREFETCH_GROUPS = 4;
 function prefetchFirstStories(groups: readonly FeedGroupDto[], seen: SeenStore) {
   for (const g of groups.slice(0, PREFETCH_GROUPS)) {
     const first = g.stories[seen.firstUnseenIndex(g)];
-    if (first?.type === 'image') Image.prefetch(first.url).catch(() => {});
+    // Videos: their first frame, which the viewer opens on while the video loads.
+    const still = first?.type === 'image' ? first.url : first?.poster;
+    if (still) Image.prefetch(still).catch(() => {});
   }
 }
 
@@ -137,6 +148,10 @@ export const StoriesBar = forwardRef<StoriesBarHandle, StoriesBarProps>(
     const [failed, setFailed] = useState(false);
     const [visible, setVisible] = useState(false);
     const [viewer, setViewer] = useState<number | null>(null);
+    // Energized style: the card that was previewing when the viewer opened from the bar. Its
+    // circle stays aside (as while it previewed) instead of coming back as the viewer opens.
+    const [heldIndex, setHeldIndex] = useState<number | null>(null);
+    const previewing = useRef<number | null>(null);
     const [pressed, setPressed] = useState<number | null>(null);
     // The circle tapped to open the viewer, shown pressed until the viewer shows.
     const [opening, setOpening] = useState<number | null>(null);
@@ -153,6 +168,7 @@ export const StoriesBar = forwardRef<StoriesBarHandle, StoriesBarProps>(
     const pending = useRef(new Map<string, ReturnType<typeof setTimeout>>());
     const appActive = useRef(AppState.currentState === 'active');
     const scroll = useRef({ offset: 0, viewport: 0 });
+    const scroller = useRef<ScrollView>(null);
 
     const scheme = useColorScheme();
     const background = props.backgroundColor ?? (scheme === 'dark' ? '#000000' : '#ffffff');
@@ -192,9 +208,14 @@ export const StoriesBar = forwardRef<StoriesBarHandle, StoriesBarProps>(
           // Show new covers only once they're loaded, so they don't pop in.
           await Promise.race([
             Promise.all(
-              next.groups
-                .slice(0, 8)
-                .map((g) => Image.prefetch(g.cover?.image ?? g.coverUrl).catch(() => {})),
+              next.groups.slice(0, 8).flatMap((g) => [
+                Image.prefetch(g.cover?.image ?? g.coverUrl).catch(() => {}),
+                // Energized style: the cards' photo stills too, so cards don't change once
+                // shown. (A video's still is a paused player, which loads with its card.)
+                ...(isEnergized(next.app.layout) && g.stories[0]?.type === 'image'
+                  ? [Image.prefetch(g.stories[0].url).catch(() => {})]
+                  : []),
+              ]),
             ),
             new Promise((r) => setTimeout(r, REVEAL_WAIT_MS)),
           ]);
@@ -306,6 +327,41 @@ export const StoriesBar = forwardRef<StoriesBarHandle, StoriesBarProps>(
       reportImpressions();
     }, [reportImpressions]);
 
+    // Energized style: story cards with the circle in the middle, previewing stories in place
+    // (not with reduced motion).
+    const energizedCards = isEnergized(feed?.app.layout);
+    const energized = useEnergized({
+      enabled: energizedCards && !reducedMotion,
+      active: visible && viewer === null,
+      groups,
+      visibleNow: () =>
+        scroll.current.viewport
+          ? fullyVisibleItems(
+              groups.length,
+              metrics,
+              scroll.current.offset,
+              scroll.current.viewport,
+            )
+          : [],
+    });
+    previewing.current = energized.preview?.groupIndex ?? null;
+    // Once the viewer has closed and the previews have picked up again.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: also re-run when the previews resume
+    useEffect(() => {
+      if (viewer === null) setHeldIndex(null);
+    }, [viewer, energized.preview]);
+
+    // Energized style: each card scrolls into view for its turn, so the turns go through every
+    // group.
+    const previewTurn = energized.preview?.turn;
+    const previewIndex = energized.preview?.groupIndex;
+    // biome-ignore lint/correctness/useExhaustiveDependencies: once per turn
+    useEffect(() => {
+      if (previewIndex === undefined || !scroll.current.viewport) return;
+      const x = offsetToShow(previewIndex, metrics, scroll.current.offset, scroll.current.viewport);
+      if (x !== null) scroller.current?.scrollTo({ x, animated: true });
+    }, [previewTurn]);
+
     useEffect(() => {
       const sub = AppState.addEventListener('change', (state) => {
         appActive.current = state === 'active';
@@ -362,6 +418,7 @@ export const StoriesBar = forwardRef<StoriesBarHandle, StoriesBarProps>(
         setOpening(index);
         void (zoom ? circle(index) : Promise.resolve(null)).then((rect) => {
           setOpenFrom(rect);
+          setHeldIndex(previewing.current);
           setViewer(index);
         });
         return true;
@@ -387,6 +444,7 @@ export const StoriesBar = forwardRef<StoriesBarHandle, StoriesBarProps>(
     return (
       <Animated.View style={[{ opacity }, style]}>
         <ScrollView
+          ref={scroller}
           horizontal
           showsHorizontalScrollIndicator={false}
           accessibilityRole="list"
@@ -400,10 +458,12 @@ export const StoriesBar = forwardRef<StoriesBarHandle, StoriesBarProps>(
           onLayout={(e) => {
             scroll.current.viewport = e.nativeEvent.layout.width;
             reportImpressions();
+            energized.onScroll();
           }}
           onScroll={(e) => {
             scroll.current.offset = e.nativeEvent.contentOffset.x;
             reportImpressions();
+            energized.onScroll();
           }}
         >
           {groups.map((g, i) => {
@@ -426,17 +486,40 @@ export const StoriesBar = forwardRef<StoriesBarHandle, StoriesBarProps>(
                 onPressIn={() => setPressed(i)}
                 onPressOut={() => setPressed(null)}
               >
-                <Circle
-                  group={g}
-                  appearance={appearance}
-                  seen={isSeen}
-                  metrics={metrics}
-                  reducedMotion={reducedMotion}
-                  background={background}
-                  textColor={theme.titleColor === 'currentColor' ? textColor : theme.titleColor}
-                  titleFont={theme.titleFont === 'inherit' ? undefined : theme.titleFont}
-                  pressed={pressed === i || opening === i}
-                />
+                {energizedCards ? (
+                  <EnergizedCard
+                    group={g}
+                    appearance={appearance}
+                    seen={isSeen}
+                    metrics={metrics}
+                    reducedMotion={reducedMotion}
+                    background={background}
+                    textColor={theme.titleColor === 'currentColor' ? textColor : theme.titleColor}
+                    titleFont={theme.titleFont === 'inherit' ? undefined : theme.titleFont}
+                    pressed={pressed === i || opening === i}
+                    held={heldIndex === i}
+                    preview={
+                      energized.preview?.groupIndex === i
+                        ? g.stories[energized.preview.storyIndex]
+                        : null
+                    }
+                    previewTurn={
+                      energized.preview?.groupIndex === i ? energized.preview.turn : undefined
+                    }
+                  />
+                ) : (
+                  <Circle
+                    group={g}
+                    appearance={appearance}
+                    seen={isSeen}
+                    metrics={metrics}
+                    reducedMotion={reducedMotion}
+                    background={background}
+                    textColor={theme.titleColor === 'currentColor' ? textColor : theme.titleColor}
+                    titleFont={theme.titleFont === 'inherit' ? undefined : theme.titleFont}
+                    pressed={pressed === i || opening === i}
+                  />
+                )}
               </Pressable>
             );
           })}

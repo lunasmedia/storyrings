@@ -195,6 +195,41 @@ export interface BarLayout {
   corner: number;
   /** Space between items in px. */
   gap: number;
+  /**
+   * How the bar moves on its own. "energized" previews stories inside the cards, one visible
+   * group at a time; it needs vertical cards (taller than wide). Absent = "static".
+   */
+  motion?: BarMotion;
+}
+
+/** The numeric size fields of a layout. */
+export type BarLayoutSize = Exclude<keyof BarLayout, 'motion'>;
+
+export const barMotions = ['static', 'energized'] as const;
+export type BarMotion = (typeof barMotions)[number];
+
+/** Energized style: how long each group's story is previewed before moving on. */
+export const ENERGIZED_PREVIEW_MS = 7000;
+
+/**
+ * The Energized style comes in one size: a story-shaped (9:16) card, about three to a phone's
+ * width. Corners and spacing can still be changed.
+ */
+export const ENERGIZED_SIZE = { width: 112, height: 200 } as const;
+
+/** A layout as it applies: the Energized style always has its own size. */
+export function withEnergizedSize<T extends BarLayout>(l: T): T {
+  return l.motion === 'energized' ? { ...l, ...ENERGIZED_SIZE } : l;
+}
+
+/** Vertical thumbnails: cards taller than they are wide. */
+export function isVerticalLayout(l: Pick<BarLayout, 'width' | 'height'>): boolean {
+  return l.height > l.width;
+}
+
+/** Whether a bar previews stories in its cards (Energized style on vertical cards). */
+export function isEnergized(l: BarLayout | null | undefined): boolean {
+  return !!l && l.motion === 'energized' && isVerticalLayout(l);
 }
 
 export const BAR_LAYOUT_LIMITS = {
@@ -202,20 +237,21 @@ export const BAR_LAYOUT_LIMITS = {
   height: [40, 240],
   corner: [0, 50],
   gap: [0, 48],
-} as const satisfies Record<keyof BarLayout, readonly [number, number]>;
+} as const satisfies Record<BarLayoutSize, readonly [number, number]>;
 
 export const DEFAULT_BAR_LAYOUT: BarLayout = { width: 68, height: 68, corner: 50, gap: 14 };
 
 /** Fills in and clamps a layout (unknown/invalid values fall back to the defaults). */
 export function resolveBarLayout(input?: Partial<BarLayout> | null): BarLayout {
   const out = { ...DEFAULT_BAR_LAYOUT };
-  for (const key of Object.keys(BAR_LAYOUT_LIMITS) as (keyof BarLayout)[]) {
+  for (const key of Object.keys(BAR_LAYOUT_LIMITS) as BarLayoutSize[]) {
     const v = input?.[key];
     if (typeof v !== 'number' || !Number.isFinite(v)) continue;
     const [min, max] = BAR_LAYOUT_LIMITS[key];
     out[key] = Math.round(Math.min(max, Math.max(min, v)));
   }
-  return out;
+  if (input?.motion === 'energized') out.motion = 'energized';
+  return withEnergizedSize(out);
 }
 
 /** Corner radius in px for a layout. */

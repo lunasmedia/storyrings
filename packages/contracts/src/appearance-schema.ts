@@ -6,8 +6,10 @@ import {
   badgePositions,
   badgePresets,
   badgeTypes,
+  barMotions,
   ringAnimations,
   ringStyles,
+  withEnergizedSize,
 } from './appearance';
 import { id } from './common';
 
@@ -80,8 +82,11 @@ export const barLayoutSchema = z
     height: layoutNumber('height'),
     corner: layoutNumber('corner'),
     gap: layoutNumber('gap'),
+    motion: z.enum(barMotions).optional(),
   })
-  .strict();
+  .strict()
+  // The Energized style has one size: whatever width and height come with it.
+  .transform(withEnergizedSize);
 
 const EMOJI = /^\p{Extended_Pictographic}/u;
 

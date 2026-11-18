@@ -163,6 +163,15 @@ They're capped at 100%.
 | **Completion rate** | Completions ÷ Opens × 100 | How often a group that started playing was watched to its last story. |
 | **Click-through rate** | Clicks ÷ Impressions × 100 | How often a story impression led to a button tap. |
 | **Share rate** | Shares ÷ Impressions × 100 | How often a story impression was shared. |
+| **Response rate** | Unique responders ÷ Unique viewers of interactive stories × 100 | Share of people who answered an interactive element (poll, quiz or emoji slider). |
+
+**Response rate** counts unique people, not events, unlike the rates above. The bottom is the
+people who viewed a story with a poll, quiz or emoji slider (a story impression, as for Reach)
+in the period; the top is those of them who answered one of that story's stickers in the period.
+Someone who answers several stickers counts once. Answers without a viewer ID, or from people
+with no recorded view of that story, aren't counted, so it never exceeds 100%. Links and
+countdowns aren't answered, so stories with only those aren't in the base. It's on Home with
+the other rates, and on Analytics → Interactions with its responders and viewers.
 
 **Rankings.** "Top" lists (top groups, top stories) are ranked by the **count** (clicks, views,
 impressions), never by a rate. On small numbers a rate misleads: a story with 1 view and 1 click
@@ -253,6 +262,9 @@ our definitions follow:
   [Instagram Platform insights](https://developers.facebook.com/documentation/instagram-platform/reference/instagram-media/insights)
 
 ## Changes
+
+- **2026-11-16:** new **Response rate**: unique responders ÷ unique viewers of stories with a
+  poll, quiz or emoji slider. Shown on Home and in Analytics → Interactions.
 
 - **2026-10-19:** Average daily reach removed; Reach already gives the unique people for stories
   and groups.

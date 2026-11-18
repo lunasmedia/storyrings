@@ -114,6 +114,23 @@ export const REACH_DEFINITIONS = {
   },
 } as const;
 
+/** Unique people who answered interactive stickers, out of those who saw them. */
+export const RESPONSE_RATE = {
+  key: 'response',
+  label: 'Response rate',
+  short: 'Response rate',
+  summary: 'Share of people who saw a poll, quiz or slider and answered it.',
+  formula: 'Unique responders ÷ Unique viewers of interactive stories × 100',
+  definition:
+    'The share of people who answered an interactive element (a poll, quiz or emoji slider) out of the people who viewed a story with one, during the selected period. Both sides count unique people, so someone who answers several polls counts once, and only answers to stories they viewed in the period are counted, so it never exceeds 100%. Links and countdowns aren’t answered, so stories with only those don’t count.',
+} as const;
+
+/** Response rate as a fraction (0..1), or null when nobody saw an interactive story. */
+export function responseRate(reach: { interactiveViewers: number; responders: number }) {
+  if (!reach.interactiveViewers) return null;
+  return Math.min(1, reach.responders / reach.interactiveViewers);
+}
+
 /**
  * Traffic and active users wherever the SDK runs, including pages and screens without a
  * story bar (when the site or app loads the SDK there).

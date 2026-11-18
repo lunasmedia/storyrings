@@ -25,10 +25,13 @@ import {
   countdownParts,
   DEFAULT_ACCENT,
   DEFAULT_SLIDER_EMOJI,
+  ENERGIZED_PREVIEW_MS,
+  EnergizedCycle,
   GestureRecognizer,
   type GroupLike,
   INTERACTION_UNITS,
   interactionLabels,
+  isEnergized,
   labels,
   loadViewerId,
   normalizeFeed,
@@ -71,12 +74,14 @@ export const suites: Record<string, (input: Input) => Json | Promise<Json>> = {
   sessions: runSessions,
   interactions: runInteractions,
   display: (input: Input) => storyLook(input.story),
+  energized: runEnergized,
 };
 
 /** Values every SDK uses as-is (spec/constants.json). Not cases: generated from the code. */
 export function constants(): Json {
   return {
     viewableMs: VIEWABLE_MS,
+    energizedPreviewMs: ENERGIZED_PREVIEW_MS,
     tapMaxMs: TAP_MAX_MS,
     sessionTimeoutMs: SESSION_TIMEOUT_MS,
     viewerIdMaxAgeMs: VIEWER_ID_MAX_AGE_MS,
@@ -363,4 +368,30 @@ function runInteractions(input: Input): Json {
     default:
       throw new Error(`unknown op ${input.op}`);
   }
+}
+
+// --- energized ----------------------------------------------------------------------------
+
+/**
+ * input: { op: 'isEnergized', layout } → { energized }
+ *   or { op: 'cycle', groups: [storyIds…], seen?: storyIds (no effect), steps: [['visible', indexes] |
+ *   ['tick', ms] | ['markSeen', storyId] | ['groups', [storyIds…]]] }
+ *   → { steps: [{ current: { groupIndex, storyIndex, storyId, turn } | null, remainingMs }] }
+ */
+function runEnergized(input: Input): Json {
+  if (input.op === 'isEnergized') return { energized: isEnergized(input.layout) };
+  const toGroups = (lists: string[][]): GroupLike[] =>
+    lists.map((ids, i) => ({ id: `g${i}`, stories: ids.map((id) => ({ id, durationMs: 1 })) }));
+  const cycle = new EnergizedCycle(toGroups(input.groups));
+  const steps = (input.steps as [string, Input][]).map(([op, arg]) => {
+    if (op === 'visible') cycle.setVisible(arg);
+    else if (op === 'tick') cycle.tick(arg);
+    // Seen stories make no difference: it's always the first.
+    else if (op === 'markSeen')
+      return { current: cycle.current(), remainingMs: cycle.remainingMs() };
+    else if (op === 'groups') cycle.setGroups(toGroups(arg));
+    else throw new Error(`energized: unknown step ${op}`);
+    return { current: cycle.current(), remainingMs: cycle.remainingMs() };
+  });
+  return { steps };
 }

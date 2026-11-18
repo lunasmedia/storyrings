@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 import {
   badgeSpeech,
   barMetrics,
+  fullyVisibleItems,
   gapColor,
   linearGradient,
+  offsetToShow,
   ringAnimation,
   ringPaint,
   themeAppearance,
@@ -105,5 +107,34 @@ describe('visibleItems', () => {
 
   it('follows the scroll position', () => {
     expect(visibleItems(5, m, 100, 200)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('fullyVisibleItems (Energized style)', () => {
+  // Items are 72 + 12 wide, 10 apart, after 16 of padding: 16–100, 110–194, 204–288.
+  const m = { width: 72, gap: 10, padding: 16 };
+  it('only counts cards entirely on screen', () => {
+    expect(fullyVisibleItems(5, m, 0, 300)).toEqual([0, 1, 2]);
+    expect(fullyVisibleItems(5, m, 0, 250)).toEqual([0, 1]);
+    expect(fullyVisibleItems(5, m, 20, 300)).toEqual([1, 2]);
+    expect(fullyVisibleItems(5, m, 0, 0)).toEqual([]);
+  });
+});
+
+describe('offsetToShow', () => {
+  // Items 84 wide (72 + 12), 10 apart, after 12 of padding: item i starts at 12 + 94i.
+  const m = { width: 72, gap: 10, padding: 12 };
+
+  it('leaves a card already fully on screen where it is', () => {
+    expect(offsetToShow(1, m, 0, 300)).toBeNull();
+  });
+
+  it('scrolls the least that shows all of a card cut off on the right', () => {
+    // Item 3 spans 294–378: its right edge lines up with the viewport's.
+    expect(offsetToShow(3, m, 0, 300)).toBe(78);
+  });
+
+  it('scrolls back to a card off to the left (the turns loop to the first)', () => {
+    expect(offsetToShow(0, m, 200, 300)).toBe(12);
   });
 });

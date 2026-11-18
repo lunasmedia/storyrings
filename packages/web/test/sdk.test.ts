@@ -340,6 +340,18 @@ describe('viewer', () => {
     expect(live()).toContain('story 2 of 2');
   });
 
+  it('keeps the control icons in place between updates, so a click on them isn’t lost', async () => {
+    const { bar } = await mountBar();
+    circles(bar)[0]!.click();
+    const pause = viewerRoot()!.querySelector('.pause')!;
+    const drawn = pause.firstElementChild;
+    loadImage(); // the viewer updates (story ready) while the icon stays the same
+    expect(pause.firstElementChild).toBe(drawn);
+    key('k'); // pause: now the icon changes
+    expect(pause.firstElementChild).not.toBe(drawn);
+    expect(pause.getAttribute('aria-label')).toBe('Play');
+  });
+
   it('closes after the last story and resumes groups at the first unseen story', async () => {
     vi.useFakeTimers({
       toFake: [
@@ -1050,6 +1062,87 @@ describe('bar layout from the dashboard', () => {
     expect(vars(bar)).toContain('--s-size:72px;--s-h:112px;--s-r:18px');
     expect(vars(bar)).toContain('--s-gap:8px');
     expect(vars(bar)).toContain('--s-title-size:13px');
+  });
+
+  describe('Energized style', () => {
+    beforeEach(() => {
+      // Every card is fully on screen as soon as it's observed.
+      vi.stubGlobal(
+        'IntersectionObserver',
+        class {
+          constructor(private readonly cb: IntersectionObserverCallback) {}
+          observe(el: Element) {
+            queueMicrotask(() =>
+              this.cb(
+                [{ target: el, isIntersecting: true, intersectionRatio: 1 } as never],
+                this as never,
+              ),
+            );
+          }
+          unobserve() {}
+          disconnect() {}
+        },
+      );
+    });
+    const settle = () => new Promise((r) => setTimeout(r, 250));
+    const energized = (width: number, height: number) =>
+      serve({
+        ...feed,
+        app: { ...feed.app, layout: { width, height, corner: 16, gap: 8, motion: 'energized' } },
+      });
+
+    it('previews the first visible group’s story in its vertical card', async () => {
+      energized(72, 112);
+      const { bar } = await mountBar();
+      await settle();
+      const previews = bar.querySelectorAll('.ep');
+      expect(previews).toHaveLength(1);
+      expect(previews[0]!.closest('li')!.getAttribute('data-group')).toBe('gA');
+      expect(previews[0]!.querySelector('img')!.getAttribute('src')).toBe(
+        'https://cdn.test/a1.png',
+      );
+      // A preview isn't a story view.
+      expect(JSON.stringify(fetchMock.mock.calls)).not.toContain('story_view');
+    });
+
+    it('keeps the pictures already showing when the viewer closes, so nothing flashes', async () => {
+      energized(72, 112);
+      const { bar } = await mountBar();
+      await settle();
+      const pictures = () =>
+        [...bar.querySelectorAll('[data-media]')].filter((el) => el.closest('li[data-group="gB"]'));
+      const before = pictures();
+      expect(before).toHaveLength(2); // the card's still and cover, the circle's cover
+      circles(bar)[0]!.click();
+      key('ArrowRight');
+      key('Escape');
+      // Re-rendered (the opened group's ring turned grey), with the same picture elements.
+      expect(bar.querySelector('li[data-group="gA"]')!.className).toBe('seen');
+      const after = pictures();
+      expect(after).toHaveLength(before.length);
+      // The very same elements (DOM equality would pass for fresh copies too).
+      expect(after.every((el, i) => el === before[i])).toBe(true);
+    });
+
+    it('draws story cards in their one size, with the circle in the middle', async () => {
+      energized(68, 68);
+      const { bar } = await mountBar();
+      await settle();
+      expect(vars(bar)).toContain('--s-size:112px;--s-h:200px');
+      const card = bar.querySelector('[data-group="gB"] .card')!;
+      // A still of its first story (the one it previews) fills the card, over the cover until
+      // it loads; the cover is in the circle.
+      expect(card.querySelector('.card-bg img')!.getAttribute('src')).toBe(
+        'https://cdn.test/b.png',
+      );
+      expect(card.querySelector('.card-bg .still')!.getAttribute('src')).toBe(
+        'https://cdn.test/b1.png',
+      );
+      expect(card.querySelector('.avatar .cover')!.getAttribute('src')).toBe(
+        'https://cdn.test/b.png',
+      );
+      expect(card.querySelector(':scope > .title')!.textContent).toBe('Sale');
+    });
   });
 });
 

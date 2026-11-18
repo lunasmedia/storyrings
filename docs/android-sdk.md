@@ -40,7 +40,7 @@ Local demo token (after `pnpm db:seed`): `pk_live_DemoMobileAppToken000000`
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("io.github.brad-jeancy:storyrings-android:0.1.1")
+    implementation("io.github.brad-jeancy:storyrings-android:0.1.2")
 }
 ```
 
@@ -177,6 +177,27 @@ StoriesBar(
     ),
 )
 ```
+
+## Energized style
+
+Settings → Story bar style → Shape & size → Style can be set to **Energized**, with no code
+changes. The bar then shows story-shaped cards in one size (112 × 200; corners and spacing can
+still be changed): each shows a still of its group's first story (the image, or a video's
+first frame; the cover until that loads), with the group's cover in a circle in the middle
+(ring, animation and badge as usual; hidden while the card previews its story) and the title
+inside at the bottom. The cards preview their stories:
+
+- The first card fully on screen plays its group's first story for 7 seconds, then goes back
+  to the still. Only each group's first story is ever previewed, seen or not. Videos play
+  muted; images zoom in and out slowly.
+- Then the next card takes its turn, through every group in the bar: a card that isn't fully
+  on screen is scrolled into view for its turn. After the last one it scrolls back and starts
+  again from the first.
+- When the bar is scrolled so that the card previewing is no longer fully on screen, it starts
+  again from the first card fully on screen.
+
+Previews aren't story views: they send no analytics and don't mark stories as seen. They pause
+while the viewer is open or the app is in the background, and are off when animations are turned off in the system settings.
 
 ## Fitting the screen
 

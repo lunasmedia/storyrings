@@ -15,10 +15,11 @@ import com.lunasmedia.storyrings.core.StoryEvent
 import com.lunasmedia.storyrings.core.answerBody
 import com.lunasmedia.storyrings.core.answersUrl
 import com.lunasmedia.storyrings.core.normalizeFeedJson
+import java.io.File
 import java.net.URLEncoder
 
 /** The SDK version, sent with analytics as `android@<version>`. */
-const val STORIES_SDK_VERSION = "0.1.1"
+const val STORIES_SDK_VERSION = "0.1.2"
 
 /** One HTTP request; `done(status, body)` with status 0 for a network failure. */
 fun interface HttpClient {
@@ -201,6 +202,7 @@ class StoriesClient internal constructor(
             synchronized(clients) {
                 clients[key]?.let { return it }
                 val app = context.applicationContext
+                if (ImageCache.framesDir == null) ImageCache.framesDir = File(app.cacheDir, "StoryRingsFrames")
                 val client = StoriesClient(
                     token = token, apiUrl = apiUrl, analytics = analytics, reach = reach,
                     storage = storage ?: SharedPreferencesStorage(app),

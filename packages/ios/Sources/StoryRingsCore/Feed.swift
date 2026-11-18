@@ -24,10 +24,30 @@ public struct BarLayout: Equatable, Sendable {
     /// Corner rounding as % of the shorter side: 50 = circle, 0 = square.
     public let corner: Int
     public let gap: Int
+    /// "energized" previews stories inside the cards (vertical cards only); nil = static.
+    public let motion: String?
+
+    public init(width: Int, height: Int, corner: Int, gap: Int, motion: String? = nil) {
+        self.width = width
+        self.height = height
+        self.corner = corner
+        self.gap = gap
+        self.motion = motion
+    }
 
     public var cornerRadius: Double { Double(min(width, height)) * Double(corner) / 100 }
 
-    public var json: [String: Any] { ["width": width, "height": height, "corner": corner, "gap": gap] }
+    /// Vertical thumbnails: cards taller than they are wide.
+    public var isVertical: Bool { height > width }
+
+    /// The Energized style (spec/cases/energized.json): it needs vertical cards.
+    public var isEnergized: Bool { motion == "energized" && isVertical }
+
+    public var json: [String: Any] {
+        var out: [String: Any] = ["width": width, "height": height, "corner": corner, "gap": gap]
+        if let motion { out["motion"] = motion }
+        return out
+    }
 
     public static let defaults = BarLayout(width: 68, height: 68, corner: 50, gap: 14)
 
@@ -37,14 +57,16 @@ public struct BarLayout: Equatable, Sendable {
 
     /// Fills in and clamps a layout; unknown or invalid values fall back to the defaults.
     public static func resolve(_ input: Any?) -> BarLayout {
-        var out = defaults.json as! [String: Int]
+        var out: [String: Int] = ["width": defaults.width, "height": defaults.height, "corner": defaults.corner, "gap": defaults.gap]
+        var motion: String?
         if let input = object(input) {
             for (key, lo, hi) in limits {
                 guard let v = number(input[key]), v.isFinite else { continue }
                 out[key] = Int(min(hi, max(lo, v)).rounded())
             }
+            if value(input["motion"]) as? String == "energized" { motion = "energized" }
         }
-        return BarLayout(width: out["width"]!, height: out["height"]!, corner: out["corner"]!, gap: out["gap"]!)
+        return BarLayout(width: out["width"]!, height: out["height"]!, corner: out["corner"]!, gap: out["gap"]!, motion: motion)
     }
 }
 

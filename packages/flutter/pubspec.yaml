@@ -1,6 +1,6 @@
 name: stories_sdk
 description: "Stories for Flutter apps: an Instagram-style story bar and full-screen viewer, managed in the Stories dashboard."
-version: 0.1.0
+version: 0.1.1
 publish_to: none
 
 environment:
@@ -10,6 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  clock: ^1.1.1
   http: ^1.2.0
   shared_preferences: ^2.3.0
   video_player: ^2.8.0

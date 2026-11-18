@@ -177,6 +177,27 @@ StoriesBar(
 
 Titles use the system's primary text colour (light and dark mode) unless the dashboard sets one.
 
+## Energized style
+
+Settings → Story bar style → Shape & size → Style can be set to **Energized**, with no code
+changes. The bar then shows story-shaped cards in one size (112 × 200; corners and spacing can
+still be changed): each shows a still of its group's first story (the image, or a video's
+first frame; the cover until that loads), with the group's cover in a circle in the middle
+(ring, animation and badge as usual; hidden while the card previews its story) and the title
+inside at the bottom. The cards preview their stories:
+
+- The first card fully on screen plays its group's first story for 7 seconds, then goes back
+  to the still. Only each group's first story is ever previewed, seen or not. Videos play
+  muted; images zoom in and out slowly.
+- Then the next card takes its turn, through every group in the bar: a card that isn't fully
+  on screen is scrolled into view for its turn. After the last one it scrolls back and starts
+  again from the first.
+- When the bar is scrolled so that the card previewing is no longer fully on screen, it starts
+  again from the first card fully on screen.
+
+Previews aren't story views: they send no analytics and don't mark stories as seen. They pause
+while the viewer is open, the app is in the background or the bar is off screen, and are off when Reduce Motion is on.
+
 ## Fitting the screen
 
 Phones come in many shapes, so each story says how it fits the screen. You choose this per story

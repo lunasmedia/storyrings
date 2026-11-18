@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
 import '../../stories_core.dart';
@@ -137,6 +138,19 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
   // Each circle, to find where it is on screen for the zoom transition.
   final _circleKeys = <String, GlobalKey>{};
 
+  // Energized style
+  EnergizedCycle? _cycle;
+  List<FeedGroup>? _cycleGroups;
+  EnergizedPreview? _energized;
+
+  /// Energized style: the card that was previewing when the viewer opened from the bar. Its circle
+  /// stays aside (as while it previewed) instead of coming back as the viewer opens.
+  int? _heldIndex;
+  Timer? _energizedSettle;
+  Timer? _energizedNext;
+  DateTime? _lastTick;
+  bool _animationsOff = false;
+
   String get _bar => widget.bar?.trim().toLowerCase() ?? '';
   List<String> get _tags => normalizeTags(widget.tags);
 
@@ -147,6 +161,7 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
     widget.controller?._state = this;
     _client = _makeClient();
     _scroll.addListener(_reportImpressions);
+    _scroll.addListener(_energizedScrolled);
     _start();
   }
 
@@ -181,6 +196,8 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     if (widget.controller?._state == this) widget.controller?._state = null;
     _revealTimer?.cancel();
+    _energizedSettle?.cancel();
+    _energizedNext?.cancel();
     for (final t in _pending.values) {
       t.cancel();
     }
@@ -190,7 +207,9 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _tickEnergized();
     _appActive = state == AppLifecycleState.resumed;
+    _syncEnergized();
     // Offline at launch: try again when the app comes back.
     if (_appActive && _failed == false && !_fresh) unawaited(_load(force: true));
     _reportImpressions();
@@ -229,12 +248,18 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
       final seen = await _client.seenStore(feed.appId);
       final answers = await _client.answerStore(feed.appId);
       if (!mounted || seq != _loadSeq) return;
-      // Show new covers only once they're loaded, so they don't pop in.
+      // Show new covers only once they're loaded, so they don't pop in; with the Energized style,
+      // also the cards' photo stills, so cards don't change once shown. (A video's still is a
+      // paused player, which starts loading with its card.)
+      final energized = feed.layout?.isEnergized ?? false;
       await Future.any([
         Future.wait([
-          for (final g in feed.groups.take(8))
-            // A missing cover just shows the placeholder; nothing to report.
+          for (final g in feed.groups.take(8)) ...[
+            // A missing cover or still just shows the placeholder; nothing to report.
             if (g.coverUrl.isNotEmpty) precacheImage(NetworkImage(g.coverUrl), context, onError: (_, __) {}),
+            if (energized && g.stories.isNotEmpty && g.stories.first.type == 'image')
+              precacheImage(storyImage(g.stories.first, context), context, onError: (_, __) {}),
+          ],
         ]),
         Future<void>.delayed(const Duration(milliseconds: _revealWaitMs)),
       ]);
@@ -311,6 +336,107 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
     }
   }
 
+  // --- Energized style ----------------------------------------------------------------
+  // Vertical cards preview stories in place, one group at a time, each scrolled into view for
+  // its turn (spec/cases/energized.json). Previews send no analytics and mark nothing seen.
+
+  bool get _energizedRunning => _cycle != null && _visible && !_viewerOpen && _appActive;
+
+  /// Keeps the cycle in step with the feed, the settings and what covers the bar.
+  void _syncEnergized() {
+    if (!mounted) return;
+    final feed = _feed;
+    if (feed == null || !(feed.layout?.isEnergized ?? false) || _animationsOff) {
+      _tickEnergized();
+      _cycle = null;
+      _cycleGroups = null;
+      _updateEnergized();
+      return;
+    }
+    if (_cycle == null) {
+      _cycle = EnergizedCycle(feed.groups)..setVisible(_fullyVisible());
+      _cycleGroups = feed.groups;
+      _lastTick = null;
+    } else if (!identical(_cycleGroups, feed.groups)) {
+      _tickEnergized();
+      _cycle!.setGroups(feed.groups);
+      _cycleGroups = feed.groups;
+    }
+    _updateEnergized();
+  }
+
+  /// Cards entirely on screen.
+  List<int> _fullyVisible() {
+    final feed = _feed;
+    if (feed == null || !_scroll.hasClients) return const [];
+    final m = _metrics;
+    final item = m.width + 12;
+    final offset = _scroll.offset;
+    final viewport = _scroll.position.viewportDimension;
+    return [
+      for (var i = 0; i < feed.groups.length; i++)
+        if (widget.theme.barPadding + i * (item + m.gap) - offset >= -0.5 &&
+            widget.theme.barPadding + i * (item + m.gap) - offset + item <= viewport + 0.5)
+          i,
+    ];
+  }
+
+  /// The bar scrolled: once it settles, start again from the first visible card if the one
+  /// previewing has gone.
+  void _energizedScrolled() {
+    if (_cycle == null) return;
+    _energizedSettle?.cancel();
+    _energizedSettle = Timer(const Duration(milliseconds: 150), () {
+      _tickEnergized();
+      _cycle?.setVisible(_fullyVisible());
+      _updateEnergized();
+    });
+  }
+
+  /// Scrolls the bar the least that shows all of card [index], so each card is in view for its
+  /// turn and the turns go through every group.
+  void _scrollToCard(int index) {
+    if (!_scroll.hasClients) return;
+    final m = _metrics;
+    final item = m.width + 12;
+    final start = widget.theme.barPadding + index * (item + m.gap);
+    final offset = _scroll.offset;
+    final viewport = _scroll.position.viewportDimension;
+    final double target;
+    if (start < offset - 0.5) {
+      target = start;
+    } else if (start + item > offset + viewport + 0.5) {
+      target = start + item - viewport;
+    } else {
+      return;
+    }
+    _scroll.animateTo(target.clamp(0.0, _scroll.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
+  }
+
+  /// Moves the cycle on by the time played since the last tick.
+  void _tickEnergized() {
+    final now = clock.now();
+    final last = _lastTick;
+    if (last != null && _energizedRunning) _cycle?.tick(now.difference(last).inMilliseconds);
+    _lastTick = _energizedRunning ? now : null;
+  }
+
+  void _updateEnergized() {
+    _tickEnergized();
+    _energizedNext?.cancel();
+    final current = _energizedRunning ? _cycle?.current : null;
+    if (current != _energized && mounted) {
+      final newTurn = current != null && current.turn != _energized?.turn;
+      setState(() => _energized = current);
+      if (newTurn) _scrollToCard(current.groupIndex);
+    }
+    final cycle = _cycle;
+    if (current != null && cycle != null) {
+      _energizedNext = Timer(Duration(milliseconds: cycle.remainingMs), _updateEnergized);
+    }
+  }
+
   // --- Viewer -------------------------------------------------------------------------
 
   bool _openId(String groupId) {
@@ -339,8 +465,13 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
     final feed = _feed;
     final seen = _seen;
     if (feed == null || seen == null || _viewerOpen) return;
-    setState(() => _viewerOpen = true);
+    _tickEnergized();
+    setState(() {
+      _viewerOpen = true;
+      _heldIndex = _energized?.groupIndex;
+    });
     _reportImpressions();
+    _syncEnergized();
     // Open once the first story's image is ready, so the viewer doesn't open on black and a
     // spinner. The first stories load with the feed (see _preloadFirstStories), so this is
     // normally at once; meanwhile the circle stays pressed.
@@ -390,6 +521,8 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
     if (!mounted) return;
     // Rings turn grey for what was just watched.
     setState(() => _viewerOpen = false);
+    _syncEnergized();
+    setState(() => _heldIndex = null);
     widget.onClose?.call(reason ?? CloseReason.user);
     WidgetsBinding.instance.addPostFrameCallback((_) => _reportImpressions());
   }
@@ -418,7 +551,14 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
     final seen = _seen;
     if (_failed || feed == null || seen == null || feed.groups.isEmpty) return const SizedBox.shrink();
     final m = _metrics;
-    final titles = !widget.theme.hideTitles;
+    // Energized style: off when the system's animations are; synced after this frame (the
+    // feed, the settings or the visible cards may have changed).
+    _animationsOff = MediaQuery.of(context).disableAnimations;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncEnergized());
+    final preview = _energized;
+    // Energized style: story cards with the circle in the middle and their titles inside.
+    final cards = feed.layout?.isEnergized ?? false;
+    final titles = !widget.theme.hideTitles && !cards;
     final height = m.height + (titles ? 6 + widget.theme.titleSize * 1.4 * 2 : 8) + 8;
     return Semantics(
       container: true,
@@ -444,7 +584,13 @@ class _StoriesBarState extends State<StoriesBar> with WidgetsBindingObserver {
                 seen: seen.isGroupSeen(g),
                 theme: widget.theme,
                 opening: _opening == i,
+                held: _heldIndex == i,
                 onTap: () => _openIndex(i),
+                preview: preview != null && preview.groupIndex == i && preview.storyIndex < g.stories.length
+                    ? g.stories[preview.storyIndex]
+                    : null,
+                previewTurn: preview?.turn ?? 0,
+                card: cards,
               );
             },
           ),

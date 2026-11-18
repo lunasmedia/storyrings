@@ -259,6 +259,18 @@ internal class ViewerController(
             if (name != g.title) append(", ").append(name)
             if (s.alt.isNotEmpty()) append(". ").append(s.alt)
         })
+        preloadNext()
+    }
+
+    /**
+     * Gets what comes next ready while this story shows: the next story in the group, or the
+     * next group's first story (a photo, or a video's first frame to show while it loads).
+     */
+    private fun preloadNext() {
+        val next = group.stories.getOrNull(shown.storyIndex + 1)
+            ?: feed.groups.getOrNull(shown.groupIndex + 1)?.stories?.firstOrNull()
+            ?: return
+        if (next.type == "video") ImageCache.loadFrame(next.url) {} else ImageCache.load(next.url) {}
     }
 
     // Media events from the screen, for story `seq`.

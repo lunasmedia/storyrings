@@ -62,6 +62,12 @@ final class BarModel: ObservableObject {
     @Published private(set) var seenVersion = 0
     /// The circle tapped to open the viewer, shown pressed while its first story loads.
     @Published private(set) var openingIndex: Int?
+    /// Energized style: the card previewing a story now.
+    @Published private(set) var energized: EnergizedPreview?
+    /// Energized style: the card that was previewing when the viewer opened from the bar. Its
+    /// circle stays aside (as while it previewed) instead of coming back as the viewer grows out
+    /// of the card.
+    @Published private(set) var heldIndex: Int?
 
     var callbacks = BarCallbacks()
     private(set) var config: BarConfig?
@@ -84,6 +90,13 @@ final class BarModel: ObservableObject {
     private var impressed = Set<String>()
     private var pending: [String: DispatchWorkItem] = [:]
 
+    // Energized style
+    private var cycle: EnergizedCycle?
+    private var cycleGroups: [[String]] = []
+    private var lastTick: Date?
+    private var energizedSettle: DispatchWorkItem?
+    private var energizedNext: DispatchWorkItem?
+
     init() {
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
@@ -92,10 +105,16 @@ final class BarModel: ObservableObject {
             // Offline at launch: try again when the app comes back.
             if !self.failed && !self.fresh && self.config != nil { self.load(force: true) }
             self.reportImpressions()
+            self.syncEnergized()
         })
         observers.append(center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.tickEnergized()
             self?.appActive = false
             self?.reportImpressions()
+            self?.syncEnergized()
+        })
+        observers.append(center.addObserver(forName: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.syncEnergized()
         })
     }
 
@@ -103,6 +122,8 @@ final class BarModel: ObservableObject {
         observers.forEach(NotificationCenter.default.removeObserver)
         revealWork?.cancel()
         pending.values.forEach { $0.cancel() }
+        energizedSettle?.cancel()
+        energizedNext?.cancel()
     }
 
     func configure(_ config: BarConfig, reach: Bool, storage: KeyValueStorage?) {
@@ -140,7 +161,10 @@ final class BarModel: ObservableObject {
 
     private func reveal() {
         if !visible { visible = true }
-        DispatchQueue.main.async { self.reportImpressions() }
+        DispatchQueue.main.async {
+            self.reportImpressions()
+            self.syncEnergized()
+        }
     }
 
     func load(force: Bool = false) {
@@ -178,18 +202,30 @@ final class BarModel: ObservableObject {
 
     /// Loads and decodes the story each of the first groups opens on, so tapping a circle opens it
     /// at once. Loaded on the tap instead, a story not yet on the device made opening wait.
+    /// Videos load their details and first frame, so they start soon after opening on that frame.
     private func preloadFirstStories(_ feed: Feed, seen: SeenStore) {
         for group in feed.groups.prefix(preloadGroups) {
             let start = seen.firstUnseenIndex(group.stories.map(\.id))
-            guard group.stories.indices.contains(start), group.stories[start].type == "image" else { continue }
-            ImageCache.shared.load(group.stories[start].url) { _ in }
+            guard group.stories.indices.contains(start) else { continue }
+            let story = group.stories[start]
+            if story.type == "video" {
+                VideoAssets.shared.preload(story.url)
+                ImageCache.shared.loadFrame(story.url) { _ in }
+            } else {
+                ImageCache.shared.load(story.url) { _ in }
+            }
         }
     }
 
+    /// Loads the first covers before the bar appears, so they don't pop in; with the Energized
+    /// style, also each card's still (its first story: the photo, or a video's first frame), so
+    /// cards don't show their cover first and then change to the still.
     private func preloadCovers(_ feed: Feed, then done: @escaping () -> Void) {
-        let urls = feed.groups.prefix(8).map(\.coverURL).filter { !$0.isEmpty }
+        let groups = feed.groups.prefix(8)
+        let covers = groups.map(\.coverURL).filter { !$0.isEmpty }
+        let stills = feed.layout?.isEnergized == true ? groups.compactMap(\.stories.first) : []
         var finished = false
-        var remaining = urls.count
+        var remaining = covers.count + stills.count
         let finish = {
             guard !finished else { return }
             finished = true
@@ -197,11 +233,17 @@ final class BarModel: ObservableObject {
         }
         if remaining == 0 { return finish() }
         DispatchQueue.main.asyncAfter(deadline: .now() + revealWaitSeconds, execute: finish)
-        for url in urls {
-            // A missing cover just shows the placeholder; nothing to report.
-            ImageCache.shared.load(url) { _ in
-                remaining -= 1
-                if remaining == 0 { finish() }
+        // A missing cover or still just shows the placeholder; nothing to report.
+        let loaded: (UIImage?) -> Void = { _ in
+            remaining -= 1
+            if remaining == 0 { finish() }
+        }
+        for url in covers { ImageCache.shared.load(url, completion: loaded) }
+        for story in stills {
+            if story.type == "video" {
+                ImageCache.shared.loadFrame(story.url, completion: loaded)
+            } else {
+                ImageCache.shared.load(story.url, completion: loaded)
             }
         }
     }
@@ -214,14 +256,90 @@ final class BarModel: ObservableObject {
     // MARK: Impressions
 
     func setOnScreen(_ value: Bool) {
+        tickEnergized()
         onScreen = value
         reportImpressions()
+        syncEnergized()
     }
 
     func updateFrames(_ frames: [String: CGRect], viewport: CGFloat) {
         self.frames = frames
         viewportWidth = viewport
         reportImpressions()
+        energizedFramesChanged()
+    }
+
+    // MARK: Energized style
+
+    /// Vertical cards preview stories in place, one fully visible group at a time
+    /// (spec/cases/energized.json). Previews send no analytics and mark nothing seen.
+    private var energizedRunning: Bool { cycle != nil && visible && onScreen && viewer == nil && appActive }
+
+    /// Keeps the cycle in step with the feed, the settings and what covers the bar.
+    func syncEnergized() {
+        let enabled = (feed?.layout?.isEnergized ?? false) && !UIAccessibility.isReduceMotionEnabled
+        guard enabled, let feed else {
+            tickEnergized()
+            cycle = nil
+            cycleGroups = []
+            updateEnergized()
+            return
+        }
+        let groups = feed.groups.map { $0.stories.map(\.id) }
+        if cycle == nil {
+            cycle = EnergizedCycle(groups: groups)
+            cycleGroups = groups
+            lastTick = nil
+            cycle?.setVisible(fullyVisible())
+        } else if groups != cycleGroups {
+            tickEnergized()
+            cycle?.setGroups(groups)
+            cycleGroups = groups
+        }
+        updateEnergized()
+    }
+
+    /// Cards entirely on screen.
+    private func fullyVisible() -> [Int] {
+        guard viewportWidth > 0, let feed else { return [] }
+        return feed.groups.indices.filter { i in
+            guard let f = frames[feed.groups[i].id] else { return false }
+            return f.minX >= -0.5 && f.maxX <= viewportWidth + 0.5
+        }
+    }
+
+    /// The bar scrolled (or laid out): once it settles, start again from the first visible card.
+    private func energizedFramesChanged() {
+        guard cycle != nil else { return }
+        energizedSettle?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, let cycle = self.cycle else { return }
+            self.tickEnergized()
+            cycle.setVisible(self.fullyVisible())
+            self.updateEnergized()
+        }
+        energizedSettle = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    /// Moves the cycle on by the time played since the last tick.
+    private func tickEnergized() {
+        let now = Date()
+        if let last = lastTick, energizedRunning { cycle?.tick(Int(now.timeIntervalSince(last) * 1000)) }
+        lastTick = energizedRunning ? now : nil
+    }
+
+    private func updateEnergized() {
+        tickEnergized()
+        energizedNext?.cancel()
+        let current = energizedRunning ? cycle?.current : nil
+        if current != energized {
+            withAnimation(.easeInOut(duration: 0.3)) { energized = current }
+        }
+        guard current != nil, let cycle else { return }
+        let work = DispatchWorkItem { [weak self] in self?.updateEnergized() }
+        energizedNext = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(cycle.remainingMs) / 1000, execute: work)
     }
 
     /// One impression per group per bar, by the MRC/IAB rule: at least half the circle on
@@ -312,7 +430,10 @@ final class BarModel: ObservableObject {
             },
             onFinish: { [weak self] reason in self?.viewerFinished(reason) }
         )
+        tickEnergized()
+        heldIndex = energized?.groupIndex
         viewer = model
+        syncEnergized()
         // Slide: no circle to grow from, so the viewer slides up and shrinks towards the bottom.
         let zoom = transition == .zoom
         let host = ViewerController(model: model) { [weak self] in zoom ? self?.circle(for: $0) : nil }
@@ -324,6 +445,8 @@ final class BarModel: ObservableObject {
 
     private func viewerFinished(_ reason: CloseReason) {
         viewer = nil
+        syncEnergized()
+        heldIndex = nil
         presented?.dismiss(animated: false)
         // Rings turn grey for what was just watched.
         seenVersion += 1
@@ -700,6 +823,7 @@ public struct StoriesBar: View {
             let _ = { model.circleRadius = radius }()
             let gap = layout.map { CGFloat($0.gap) } ?? theme.gap
             GeometryReader { outer in
+                ScrollViewReader { scroller in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: gap) {
                         ForEach(Array(feed.groups.enumerated()), id: \.element.id) { index, group in
@@ -708,8 +832,12 @@ public struct StoriesBar: View {
                                 seen: seen.isGroupSeen(group.stories.map(\.id)),
                                 theme: theme,
                                 opening: model.openingIndex == index,
+                                held: model.heldIndex == index,
                                 onTap: { model.open(index: index) },
-                                marker: { model.setMarker($0, for: group.id) }
+                                marker: { model.setMarker($0, for: group.id) },
+                                preview: previewStory(index, group),
+                                previewTurn: model.energized?.turn ?? 0,
+                                card: layout?.isEnergized == true
                             )
                             .background(GeometryReader { item in
                                 Color.clear.preference(key: FramesKey.self, value: [group.id: item.frame(in: .named("storiesBar"))])
@@ -722,8 +850,16 @@ public struct StoriesBar: View {
                 }
                 .coordinateSpace(name: "storiesBar")
                 .onPreferenceChange(FramesKey.self) { model.updateFrames($0, viewport: outer.size.width) }
+                // Energized style: each card scrolls into view for its turn (the least scroll
+                // that shows all of it), so the turns go through every group.
+                .onChange(of: model.energized?.turn) { _ in
+                    guard let p = model.energized, feed.groups.indices.contains(p.groupIndex) else { return }
+                    withAnimation(.easeInOut(duration: 0.35)) { scroller.scrollTo(feed.groups[p.groupIndex].id) }
+                }
+                }
             }
-            .frame(height: barHeight(height))
+            // Energized cards hold their titles inside.
+            .frame(height: layout?.isEnergized == true ? height + 14 : barHeight(height))
             .opacity(model.visible ? 1 : 0)
             .accessibilityElement(children: .contain)
             .accessibilityLabel(StoriesLabels.bar)
@@ -731,6 +867,13 @@ public struct StoriesBar: View {
             // Nothing to show yet, but something must be on screen for onAppear to start loading.
             Color.clear.frame(height: 0).accessibilityHidden(true)
         }
+    }
+
+    /// Energized style: the story group `index` is previewing, if it's its turn.
+    private func previewStory(_ index: Int, _ group: FeedGroup) -> FeedStory? {
+        guard let p = model.energized, p.groupIndex == index, group.stories.indices.contains(p.storyIndex)
+        else { return nil }
+        return group.stories[p.storyIndex]
     }
 
     private func barHeight(_ item: CGFloat) -> CGFloat {

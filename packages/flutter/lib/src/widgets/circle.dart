@@ -5,7 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../stories_core.dart';
+import 'energized.dart';
 import 'style.dart';
+
+/// Energized cards: the circle in the middle is this share of the card's width.
+const energizedAvatarShare = 0.5;
 
 /// One item in the story bar: cover, ring, badge and title, in the dashboard's style.
 class StoryCircle extends StatefulWidget {
@@ -19,6 +23,10 @@ class StoryCircle extends StatefulWidget {
     required this.onTap,
     required this.theme,
     this.opening = false,
+    this.held = false,
+    this.preview,
+    this.previewTurn = 0,
+    this.card = false,
   });
 
   final FeedGroup group;
@@ -32,11 +40,33 @@ class StoryCircle extends StatefulWidget {
   /// Its viewer is opening (waiting for the first story): shown dimmed, as pressed.
   final bool opening;
 
+  /// Energized style: its viewer is open, opened while this card previewed: the circle stays
+  /// aside until the preview shows again (or moves on to another card).
+  final bool held;
+
+  /// Energized style: the story previewing in this card now, if any.
+  final FeedStory? preview;
+
+  /// Changes each time a preview starts, so the same story starts again.
+  final int previewTurn;
+
+  /// Energized style: drawn as a story card with the circle in the middle; false = a circle.
+  final bool card;
+
   @override
   State<StoryCircle> createState() => _StoryCircleState();
 }
 
 class _StoryCircleState extends State<StoryCircle> with SingleTickerProviderStateMixin {
+  /// Energized style: the preview turn whose story is showing (the circle steps aside for it).
+  int? _shownTurn;
+
+  /// Energized style: the circle stays aside while the viewer opened from this card's preview is
+  /// open, and until the preview shows again after it closes.
+  bool _keepAside = false;
+
+  /// Energized style: the card's still couldn't load, so it shows the cover instead.
+  bool _stillFailed = false;
   late final AnimationController _anim = AnimationController(vsync: this);
 
   RingStyle get _ring => widget.group.appearance.ring;
@@ -56,6 +86,12 @@ class _StoryCircleState extends State<StoryCircle> with SingleTickerProviderStat
   @override
   void didUpdateWidget(StoryCircle old) {
     super.didUpdateWidget(old);
+    if (widget.held) {
+      _keepAside = true;
+    } else if (widget.preview == null) {
+      _keepAside = false;
+    }
+    if (old.group.stories.firstOrNull?.url != widget.group.stories.firstOrNull?.url) _stillFailed = false;
     _sync();
   }
 
@@ -106,18 +142,62 @@ class _StoryCircleState extends State<StoryCircle> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final a = widget.group.appearance;
-    final ringWidth = _ring.style == 'none' ? 0.0 : _ring.width.toDouble();
-    final inset = ringWidth + (_ring.style == 'none' ? 0 : _ring.gap.toDouble());
-    final innerRadius = math.max(0.0, widget.radius - inset);
-    final label = a.badgeLabel(widget.group.endsAt);
     final textColor = DefaultTextStyle.of(context).style.color ?? Colors.black;
     final titleColor = a.title.color == 'inherit' ? textColor : parseHex(a.title.color, textColor);
     final seen = widget.seen;
     final position = StoriesLabels.openGroup(widget.group.title, widget.group.stories.length, seen);
 
-    final circle = SizedBox(
-      width: widget.width,
-      height: widget.height,
+    final circle = _circle(widget.width, widget.height, widget.radius);
+
+    return Semantics(
+      button: true,
+      label: position,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          // Items are wider than the ring by the title allowance, like the other SDKs.
+          width: widget.width + 12,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.card)
+                Opacity(opacity: widget.opening ? 0.7 : 1, child: _card())
+              else
+                Opacity(opacity: widget.opening ? 0.7 : 1, child: circle),
+              if (!widget.card && !a.title.hidden && !widget.theme.hideTitles) ...[
+                const SizedBox(height: 6),
+                Text(
+                  widget.group.title,
+                  maxLines: a.title.maxLines,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: (widget.theme.titleStyle ?? const TextStyle()).copyWith(
+                    fontSize: widget.theme.titleSize,
+                    color: titleColor,
+                    fontWeight: FontWeight.values[(a.title.weight ~/ 100 - 1).clamp(0, 8)],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The circle: cover, ring (style, animation, seen colour) and badge.
+  Widget _circle(double width, double height, double radius) {
+    final a = widget.group.appearance;
+    final ringWidth = _ring.style == 'none' ? 0.0 : _ring.width.toDouble();
+    final inset = ringWidth + (_ring.style == 'none' ? 0 : _ring.gap.toDouble());
+    final innerRadius = math.max(0.0, radius - inset);
+    final label = a.badgeLabel(widget.group.endsAt);
+    final seen = widget.seen;
+    return SizedBox(
+      width: width,
+      height: height,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -128,7 +208,7 @@ class _StoryCircleState extends State<StoryCircle> with SingleTickerProviderStat
                 painter: _RingPainter(
                   ring: _ring,
                   seen: seen,
-                  radius: widget.radius,
+                  radius: radius,
                   t: _anim.value,
                   gapColor: _ring.gapColor == 'background' || _ring.gapColor == 'transparent'
                       ? null
@@ -174,37 +254,98 @@ class _StoryCircleState extends State<StoryCircle> with SingleTickerProviderStat
         ],
       ),
     );
+  }
 
-    return Semantics(
-      button: true,
-      label: position,
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          // Items are wider than the ring by the title allowance, like the other SDKs.
-          width: widget.width + 12,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Opacity(opacity: widget.opening ? 0.7 : 1, child: circle),
-              if (!a.title.hidden && !widget.theme.hideTitles) ...[
-                const SizedBox(height: 6),
-                Text(
+  /// Energized style: the story-shaped card, showing a still of the group's first story (which
+  /// plays on its turn; the cover until the still loads), the circle in the middle (hidden while
+  /// the story shows) and the title inside at the bottom.
+  Widget _card() {
+    final a = widget.group.appearance;
+    final avatar = (widget.width * energizedAvatarShare).roundToDouble();
+    final image = widget.group.coverUrl.isEmpty ? null : widget.group.coverUrl;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(widget.radius),
+      child: SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF222222)),
+            // A still of the group's first story (the one it previews). The cover fills the card
+            // only if there's no still to show: shown while the still loads, it would flash up
+            // and then change.
+            if (widget.group.stories.isNotEmpty && !_stillFailed)
+              CardStill(
+                key: ValueKey(widget.group.stories.first.url),
+                story: widget.group.stories.first,
+                onFailed: () {
+                  if (mounted) setState(() => _stillFailed = true);
+                },
+              )
+            else if (image != null)
+              Image.network(image,
+                  fit: BoxFit.cover, excludeFromSemantics: true, errorBuilder: (_, __, ___) => const SizedBox()),
+            if (widget.preview != null)
+              StoryPreview(
+                key: ValueKey('${widget.preview!.id}#${widget.previewTurn}'),
+                story: widget.preview!,
+                onShown: () {
+                  final turn = widget.previewTurn;
+                  if (mounted) {
+                    setState(() {
+                      _shownTurn = turn;
+                      _keepAside = false;
+                    });
+                  }
+                },
+              ),
+            const Align(
+              alignment: Alignment.bottomCenter,
+              child: FractionallySizedBox(
+                heightFactor: 0.45,
+                widthFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x00000000), Color(0x99000000)],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // The circle (and its badge) gives way to the story while it shows, and while the
+            // viewer opened from that preview is open.
+            Center(
+              child: AnimatedOpacity(
+                opacity: (widget.preview != null && _shownTurn == widget.previewTurn) || widget.held || _keepAside
+                    ? 0
+                    : 1,
+                duration: const Duration(milliseconds: 300),
+                child: _circle(avatar, avatar, avatar / 2),
+              ),
+            ),
+            if (!a.title.hidden && !widget.theme.hideTitles)
+              Positioned(
+                left: 6,
+                right: 6,
+                bottom: 8,
+                child: Text(
                   widget.group.title,
                   maxLines: a.title.maxLines,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: (widget.theme.titleStyle ?? const TextStyle()).copyWith(
                     fontSize: widget.theme.titleSize,
-                    color: titleColor,
+                    color: Colors.white,
                     fontWeight: FontWeight.values[(a.title.weight ~/ 100 - 1).clamp(0, 8)],
+                    shadows: const [Shadow(color: Color(0x99000000), offset: Offset(0, 1), blurRadius: 3)],
                   ),
                 ),
-              ],
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );

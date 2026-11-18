@@ -155,6 +155,7 @@ final class ViewerModel: ObservableObject {
         link?.invalidate()
         observers.forEach(NotificationCenter.default.removeObserver)
         teardownVideo()
+        StoryAudio.setPlaying(false)
     }
 
     var group: FeedGroup { feed.groups[shown.groupIndex] }
@@ -260,6 +261,7 @@ final class ViewerModel: ObservableObject {
         link?.invalidate()
         link = nil
         player?.pause()
+        syncAudio()
         if let closeAnimation {
             closeAnimation(reason) { [onFinish] in onFinish(reason) }
         } else {
@@ -281,6 +283,27 @@ final class ViewerModel: ObservableObject {
         if !s.alt.isEmpty { announcement += ". \(s.alt)" }
         UIAccessibility.post(notification: .announcement, argument: announcement)
         loadVideo()
+        preloadNext()
+    }
+
+    /// Gets what comes next ready while this story shows: the next story in the group, or the
+    /// next group's first story. Videos load their details and start; photos download.
+    private func preloadNext() {
+        let next: FeedStory?
+        if group.stories.indices.contains(shown.storyIndex + 1) {
+            next = group.stories[shown.storyIndex + 1]
+        } else if feed.groups.indices.contains(shown.groupIndex + 1) {
+            next = feed.groups[shown.groupIndex + 1].stories.first
+        } else {
+            next = nil
+        }
+        guard let next else { return }
+        if next.type == "video" {
+            VideoAssets.shared.preload(next.url)
+            ImageCache.shared.loadFrame(next.url) { _ in }
+        } else {
+            ImageCache.shared.load(next.url) { _ in }
+        }
     }
 
     // MARK: Media
@@ -309,12 +332,15 @@ final class ViewerModel: ObservableObject {
         videoSeq = -1
         videoReady = false
         wasBuffering = false
-        guard story.type == "video", let url = URL(string: story.url) else { return }
+        guard story.type == "video", let asset = VideoAssets.shared.asset(for: story.url) else { return }
         let seq = state.seq
-        let item = AVPlayerItem(url: url)
+        // Loaded ahead when it could be (see VideoAssets), so it starts sooner.
+        let item = AVPlayerItem(asset: asset)
         let player = AVPlayer(playerItem: item)
         player.isMuted = muted
         player.automaticallyWaitsToMinimizeStalling = true
+        // Unmuted earlier in this session: sound for this video too.
+        syncAudio()
         self.player = player
         videoSeq = seq
         playerObservers.append(item.observe(\.status, options: [.new]) { [weak self] item, _ in
@@ -363,6 +389,12 @@ final class ViewerModel: ObservableObject {
         sessionMuted.toggle()
         muted = sessionMuted
         player?.isMuted = muted
+        syncAudio()
+    }
+
+    /// Plays sound (even with the silent switch on) while the viewer is open and unmuted.
+    private func syncAudio() {
+        StoryAudio.setPlaying(state.open && !done && !muted)
     }
 
     // MARK: Actions
@@ -504,6 +536,9 @@ struct StoriesViewer: View {
     private func media(_ s: FeedStory) -> some View {
         // Fill covers the screen; fit shows all of it, with the gaps in the story's colours.
         if s.type == "video" {
+            // Its first frame (usually already loaded for the bar) until the video draws, so the
+            // story shows at once instead of black while it loads.
+            RemoteImage(url: s.url, contentMode: s.look.fills ? .fill : .fit, videoFrame: true)
             if let player = model.player {
                 PlayerView(player: player, gravity: s.look.fills ? .resizeAspectFill : .resizeAspect)
             }

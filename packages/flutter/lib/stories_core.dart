@@ -3,6 +3,7 @@
 library;
 
 export 'src/core/analytics.dart';
+export 'src/core/energized.dart';
 export 'src/core/events.dart';
 export 'src/core/feed.dart';
 export 'src/core/gestures.dart';

@@ -22,6 +22,7 @@ The TypeScript SDKs run these cases in `packages/core/test/conformance.test.ts`.
 | `cases/sessions.json` | App sessions (active users) and the anonymous viewer ID's lifetime |
 | `cases/display.json` | How a story fits the screen (fill, or fit with coloured gaps) |
 | `cases/interactions.json` | Interactive stickers: reading them, placing them on the image, poll percentages, countdowns |
+| `cases/energized.json` | The Energized style: which card previews which story, for how long, and what restarts it |
 
 ## Case format
 
@@ -102,6 +103,18 @@ decimals); `percentages` (`counts`) → `{ "percents" }`; `countdown` (`endsAt`,
 times) → `{ ended, days, hours, minutes, seconds }`.
 
 **display.** Input `{ "story" }` (a feed story) → `{ fit, fill, overlay }` (`overlay` is the address of the video's overlay image, or `null`).
+
+**energized.** `op` is `isEnergized` (`layout`: a bar layout → `{ energized }`: whether the
+Energized style applies, which needs `motion: "energized"` and vertical cards) or `cycle`
+(`groups`: each group's story ids, `seen?`: story ids already seen, `steps`: `["visible",
+indexes]` (cards fully on screen), `["tick", ms]`, `["markSeen", id]` or `["groups", lists]` (a
+new feed)) → `{ steps: [{ current, remainingMs }] }`, where `current` is `{ groupIndex,
+storyIndex, storyId, turn }` or `null`. It's always the group's first story (`storyIndex` 0):
+`seen` and `markSeen` make no difference. `turn` goes up each time a preview starts; restart the
+media when it changes. Each preview lasts `energizedPreviewMs` (constants.json). The turns go
+through every group with stories, visible or not (the UI scrolls each card into view for its
+turn); `visible` only matters for where it starts, and it starts again from the first visible
+group when the group previewing isn't among them.
 
 ## Fitting the screen
 

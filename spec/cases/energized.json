@@ -1,0 +1,543 @@
+{
+  "suite": "energized",
+  "description": "The Energized style: vertical cards preview stories in place. Every group in turn shows its group's first story (only ever the first, seen or not) for 7 seconds, in bar order, looping back to the first; the bar scrolls each card into view for its turn. It starts from the first fully visible group, and scrolling starts again from the first visible one only when the card previewing is no longer fully visible. Groups without stories are skipped. It only applies to vertical cards (taller than wide).",
+  "cases": [
+    {
+      "name": "only vertical cards with the Energized style",
+      "input": {
+        "op": "isEnergized",
+        "layout": {
+          "width": 72,
+          "height": 112,
+          "corner": 16,
+          "gap": 10,
+          "motion": "energized"
+        }
+      },
+      "expect": {
+        "energized": true
+      }
+    },
+    {
+      "name": "not on square or wide cards, even when set",
+      "input": {
+        "op": "isEnergized",
+        "layout": {
+          "width": 68,
+          "height": 68,
+          "corner": 50,
+          "gap": 14,
+          "motion": "energized"
+        }
+      },
+      "expect": {
+        "energized": false
+      }
+    },
+    {
+      "name": "not without the style",
+      "input": {
+        "op": "isEnergized",
+        "layout": {
+          "width": 72,
+          "height": 112,
+          "corner": 16,
+          "gap": 10
+        }
+      },
+      "expect": {
+        "energized": false
+      }
+    },
+    {
+      "name": "every group in turn for 7 seconds, then back to the first",
+      "input": {
+        "op": "cycle",
+        "groups": [["a1", "a2"], ["b1"], ["c1"], ["d1"]],
+        "steps": [
+          ["visible", [0, 1, 2]],
+          ["tick", 6999],
+          ["tick", 1],
+          ["tick", 7000],
+          ["tick", 7000],
+          ["tick", 7000]
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 1
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 1
+            },
+            "remainingMs": 1
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "storyId": "c1",
+              "turn": 3
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 3,
+              "storyIndex": 0,
+              "storyId": "d1",
+              "turn": 4
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 5
+            },
+            "remainingMs": 7000
+          }
+        ]
+      }
+    },
+    {
+      "name": "always the group’s first story, seen or not",
+      "input": {
+        "op": "cycle",
+        "groups": [["a1", "a2", "a3"], ["b1", "b2"]],
+        "seen": ["a1", "b1", "b2"],
+        "steps": [["visible", [0, 1]], ["tick", 7000], ["markSeen", "a2"], ["tick", 7000]]
+      },
+      "expect": {
+        "steps": [
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 1
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 3
+            },
+            "remainingMs": 7000
+          }
+        ]
+      }
+    },
+    {
+      "name": "cards off screen take their turn too (the bar scrolls to them)",
+      "input": {
+        "op": "cycle",
+        "groups": [["a1"], ["b1"], ["c1"]],
+        "steps": [
+          ["visible", [0, 1]],
+          ["tick", 7000],
+          ["tick", 7000],
+          ["visible", [1, 2]],
+          ["tick", 7000]
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 1
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "storyId": "c1",
+              "turn": 3
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "storyId": "c1",
+              "turn": 3
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 4
+            },
+            "remainingMs": 7000
+          }
+        ]
+      }
+    },
+    {
+      "name": "scrolling keeps the card previewing while it stays fully visible",
+      "input": {
+        "op": "cycle",
+        "groups": [["a1"], ["b1"], ["c1"], ["d1"], ["e1"]],
+        "steps": [
+          ["visible", [0, 1, 2]],
+          ["tick", 7000],
+          ["visible", [3, 2, 1]],
+          ["tick", 3000],
+          ["visible", [1, 2, 3]],
+          ["tick", 4000]
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 1
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 4000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 4000
+          },
+          {
+            "current": {
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "storyId": "c1",
+              "turn": 3
+            },
+            "remainingMs": 7000
+          }
+        ]
+      }
+    },
+    {
+      "name": "scrolling the card previewing away starts again from the first visible group",
+      "input": {
+        "op": "cycle",
+        "groups": [["a1"], ["b1"], ["c1"], ["d1"], ["e1"]],
+        "steps": [
+          ["visible", [0, 1, 2]],
+          ["tick", 7000],
+          ["tick", 3000],
+          ["visible", [4, 2, 3]],
+          ["tick", 7000]
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 1
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 4000
+          },
+          {
+            "current": {
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "storyId": "c1",
+              "turn": 3
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 3,
+              "storyIndex": 0,
+              "storyId": "d1",
+              "turn": 4
+            },
+            "remainingMs": 7000
+          }
+        ]
+      }
+    },
+    {
+      "name": "no visible groups: nothing previews",
+      "input": {
+        "op": "cycle",
+        "groups": [["a1"], ["b1"]],
+        "steps": [["visible", [0]], ["visible", []], ["tick", 7000], ["visible", [1]]]
+      },
+      "expect": {
+        "steps": [
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 1
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": null,
+            "remainingMs": 0
+          },
+          {
+            "current": null,
+            "remainingMs": 0
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          }
+        ]
+      }
+    },
+    {
+      "name": "groups without stories are skipped",
+      "input": {
+        "op": "cycle",
+        "groups": [[], ["b1"], [], ["d1"]],
+        "steps": [["visible", [0, 1, 2, 3, 9]], ["tick", 7000], ["tick", 7000]]
+      },
+      "expect": {
+        "steps": [
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 1
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 3,
+              "storyIndex": 0,
+              "storyId": "d1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 3
+            },
+            "remainingMs": 7000
+          }
+        ]
+      }
+    },
+    {
+      "name": "a single group replays its preview",
+      "input": {
+        "op": "cycle",
+        "groups": [["a1"], []],
+        "steps": [["visible", [0, 1]], ["tick", 7000], ["tick", 14000]]
+      },
+      "expect": {
+        "steps": [
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 1
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 4
+            },
+            "remainingMs": 7000
+          }
+        ]
+      }
+    },
+    {
+      "name": "a new feed keeps the visible groups that still have stories",
+      "input": {
+        "op": "cycle",
+        "groups": [["a1"], ["b1"], ["c1"]],
+        "steps": [
+          ["visible", [0, 1, 2]],
+          ["tick", 7000],
+          ["groups", [["a1"], [], ["c1"]]],
+          ["tick", 7000]
+        ]
+      },
+      "expect": {
+        "steps": [
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 1
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 1,
+              "storyIndex": 0,
+              "storyId": "b1",
+              "turn": 2
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 0,
+              "storyIndex": 0,
+              "storyId": "a1",
+              "turn": 3
+            },
+            "remainingMs": 7000
+          },
+          {
+            "current": {
+              "groupIndex": 2,
+              "storyIndex": 0,
+              "storyId": "c1",
+              "turn": 4
+            },
+            "remainingMs": 7000
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -53,7 +53,7 @@ import {
 } from 'react-native';
 import { CtaButton } from './Cta';
 import { CloseIcon, PauseIcon, PlayIcon, ShareIcon, SoundIcon } from './icons';
-import { initialInsets, SafeAreaInsetsContext, Video } from './optional';
+import { initialInsets, SafeAreaInsetsContext, TEXTURE_VIEW, Video } from './optional';
 import { type LinkSticker, Stickers } from './Stickers';
 
 export interface StoryOpenEvent {
@@ -143,10 +143,15 @@ type PauseReason = 'user' | 'hold' | 'background' | 'share';
 interface Layer {
   seq: number;
   story: FeedStoryDto;
+  /** On screen: loaded, or (videos) showing its poster while the video loads. */
   ready: boolean;
   /** Loaded long enough ago to be on screen (see DRAW_MS). */
   drawn: boolean;
   failed: boolean;
+  /** The story itself is loaded (not just a video's poster), so its timer runs. */
+  loaded: boolean;
+  /** Its poster has shown for POSTER_SPINNER_MS without the video playing. */
+  slow: boolean;
 }
 
 /**
@@ -172,6 +177,8 @@ function animatedValue(native: boolean): Animated.Value {
 
 /** How long the previous story stays up while the next one loads, before the spinner shows. */
 const SWAP_WAIT_MS = 400;
+/** A video's poster shows on its own this long before the loading spinner joins it. */
+const POSTER_SPINNER_MS = 800;
 /**
  * How long the previous story stays under the next one after the next one has loaded. iOS draws
  * a loaded image a few frames after reporting it (up to ~100 ms for a large photo); removing the
@@ -184,6 +191,8 @@ const SETTLE_MS = 250;
  * videos draw at once, so theirs show at once.
  */
 const DRAW_MS = 100;
+/** Android: how long a loaded image takes to be drawn, before the viewer slides in over it. */
+const ANDROID_DRAW_MS = 150;
 /** Photos over this many pixels wait DRAW_MS (a phone screen is about 1.2-1.4 million). */
 const LARGE_PIXELS = 4_000_000;
 /**
@@ -451,7 +460,15 @@ export function Viewer(props: ViewerProps) {
     // The new story loads underneath the current one, which stays visible until the
     // new one can draw, so skipping never flashes black.
     layers.current = [
-      { seq: s.seq, story: st, ready: false, drawn: false, failed: false },
+      {
+        seq: s.seq,
+        story: st,
+        ready: false,
+        drawn: false,
+        failed: false,
+        loaded: false,
+        slow: false,
+      },
       ...layers.current,
     ];
     clearTimeout(settleTimer.current);
@@ -479,13 +496,13 @@ export function Viewer(props: ViewerProps) {
     for (const type of ['NEXT', 'PREV', 'NEXT_GROUP'] as const) {
       const n = peek({ type });
       const target = n.open ? groups[n.groupIndex]?.stories[n.storyIndex] : undefined;
-      if (target?.type === 'image') Image.prefetch(target.url).catch(() => {});
+      const still = target?.type === 'image' ? target.url : target?.poster;
+      if (still) Image.prefetch(still).catch(() => {});
     }
   };
 
-  const mediaReady = (seq: number, durationMs?: number) => {
-    const layer = layers.current.find((l) => l.seq === seq);
-    if (!layer || seq !== state.current.seq) return;
+  /** The story (or a video's poster) can be drawn: shows it, and opens the viewer if it's waiting. */
+  const showLayer = (layer: Layer) => {
     if (!layer.ready) {
       layer.ready = true;
       clearTimeout(swapTimer.current);
@@ -507,8 +524,32 @@ export function Viewer(props: ViewerProps) {
         layer.drawn = true;
       }
       rerender();
-      requestAnimationFrame(() => requestAnimationFrame(() => startEnter.current()));
+      // Android draws a loaded image a few frames later: the viewer slid in black until then.
+      if (Platform.OS === 'android') setTimeout(() => startEnter.current(), ANDROID_DRAW_MS);
+      else requestAnimationFrame(() => requestAnimationFrame(() => startEnter.current()));
     }
+  };
+
+  /**
+   * A video's first frame (made by the server) has loaded: the story opens on it at once, as the
+   * native apps do, rather than waiting hidden for the video. Its timer waits for the video.
+   */
+  const posterReady = (seq: number) => {
+    const layer = layers.current.find((l) => l.seq === seq);
+    if (!layer || seq !== state.current.seq || layer.loaded) return;
+    showLayer(layer);
+    setTimeout(() => {
+      if (layer.loaded) return;
+      layer.slow = true;
+      rerender();
+    }, POSTER_SPINNER_MS);
+  };
+
+  const mediaReady = (seq: number, durationMs?: number) => {
+    const layer = layers.current.find((l) => l.seq === seq);
+    if (!layer || seq !== state.current.seq) return;
+    showLayer(layer);
+    layer.loaded = true;
     dispatch({ type: 'MEDIA_READY', durationMs });
   };
 
@@ -686,7 +727,10 @@ export function Viewer(props: ViewerProps) {
   const segments = s.open ? progressSegments(s, groups) : [];
   const insets = useInsets();
   // While the previous story still covers the loading one, no spinner is needed.
-  const showSpinner = s.buffering && layers.current.length === 1 && !layers.current[0]?.failed;
+  // A video's poster shows on its own for a moment first.
+  const only = layers.current.length === 1 ? layers.current[0] : undefined;
+  const showSpinner =
+    s.buffering && !!only && !only.failed && (only.loaded || !only.ready || only.slow);
   // Kept between renders: a natively driven animation keeps moving the views it started on, and
   // new style nodes on each render left a spring-back after a short drag stuck where it began.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the animated values never change
@@ -743,9 +787,10 @@ export function Viewer(props: ViewerProps) {
                 background={!(l.ready && l.seq === s.seq && layers.current.length > 1)}
                 paused={s.paused}
                 onReady={mediaReady}
+                onPoster={posterReady}
                 onFailed={mediaFailed}
                 onBuffering={(on) => {
-                  if (l.seq !== state.current.seq || !l.ready) return;
+                  if (l.seq !== state.current.seq || !l.loaded) return;
                   dispatch(on ? { type: 'MEDIA_LOADING' } : { type: 'MEDIA_READY' });
                 }}
                 onEnd={() => l.seq === state.current.seq && dispatch({ type: 'NEXT', auto: true })}
@@ -1003,6 +1048,8 @@ interface MediaProps {
   background: boolean;
   paused: boolean;
   onReady(seq: number, durationMs?: number): void;
+  /** A video's poster has loaded (see FeedStoryDto.poster). */
+  onPoster(seq: number): void;
   onFailed(seq: number): void;
   onBuffering(on: boolean): void;
   onEnd(): void;
@@ -1014,6 +1061,7 @@ function Media({
   background,
   paused,
   onReady,
+  onPoster,
   onFailed,
   onBuffering,
   onEnd,
@@ -1039,15 +1087,34 @@ function Media({
     return (
       <>
         {gaps}
+        {/* The first frame, under the video until it draws, so the story opens on its picture. */}
+        {story.poster && (
+          <Image
+            source={{ uri: story.poster }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={look.fit === 'fill' ? 'cover' : 'contain'}
+            fadeDuration={0}
+            accessibilityIgnoresInvertColors
+            onLoad={() => onPoster(seq)}
+          />
+        )}
         <Video
+          // Android: a TextureView, which moves and fades with the views around it (a SurfaceView
+          // showed black while the viewer slid in, and lagged behind animations and scrolling).
+          viewType={TEXTURE_VIEW}
           source={{ uri: story.url }}
           style={StyleSheet.absoluteFill}
           resizeMode={look.fit === 'fill' ? 'cover' : 'contain'}
           paused={paused || !current}
           muted={muted}
+          // Always set: left out, Android's player gets volume 0, so unmuting played silence.
+          volume={1}
           repeat={false}
           playInBackground={false}
-          ignoreSilentSwitch="obey"
+          // Unmuted, it's heard with the iPhone's silent switch on, like other video apps.
+          ignoreSilentSwitch={muted ? 'obey' : 'ignore'}
+          // Android covers the video with black until its first frame: the poster shows instead.
+          shutterColor="transparent"
           accessibilityLabel={story.alt || undefined}
           onLoad={(d: { duration?: number }) => {
             duration.current = d.duration ? d.duration * 1000 : undefined;
@@ -1145,7 +1212,9 @@ const FallbackContext = createContext<{ top: number; bottom: number } | null>(nu
 
 const s_ = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000', overflow: 'hidden' },
-  hidden: { opacity: 0 },
+  // Android skips drawing fully transparent views, so the first story would only start drawing
+  // as the viewer slid in (black for a few frames): nearly transparent, it's ready beforehand.
+  hidden: { opacity: Platform.OS === 'android' ? 0.01 : 0 },
   center: { alignItems: 'center', justifyContent: 'center' },
   error: { color: '#fff', fontSize: 15 },
   spinner: { position: 'absolute', alignSelf: 'center', top: '50%', marginTop: -18 },

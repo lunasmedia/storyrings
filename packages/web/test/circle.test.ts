@@ -9,7 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   badgeSpeech,
   type CircleState,
+  cardStill,
   circleVars,
+  renderCard,
   renderCircle,
   themeAppearance,
 } from '../src/circle.js';
@@ -304,5 +306,73 @@ describe('createBarPreview', () => {
     expect(root.querySelector('.c')!.className).not.toContain('anim-');
     p.destroy();
     expect(container.childElementCount).toBe(0);
+  });
+
+  it('keeps the items (and their loaded pictures) when only corners or spacing change', () => {
+    const container = document.createElement('div');
+    const layout = { width: 112, height: 200, corner: 12, gap: 8, motion: 'energized' as const };
+    const p = createBarPreview(container, {
+      groups: [{ ...base }],
+      layout,
+      reducedMotion: true,
+    });
+    const root = container.querySelector('[data-stories-preview]')!.shadowRoot!;
+    const card = root.querySelector('.card');
+    p.update({ layout: { ...layout, corner: 30, gap: 20 } });
+    expect(root.querySelector('.card')).toBe(card);
+    expect(root.querySelector('.bar')!.getAttribute('style')).toContain('--s-gap:20px');
+    p.update({ seen: true });
+    expect(root.querySelector('.card')).not.toBe(card);
+    p.destroy();
+  });
+});
+
+describe('Energized card stills', () => {
+  const story = (type: 'image' | 'video') => ({
+    id: 's',
+    type,
+    url: `https://cdn.test/s.${type === 'image' ? 'png' : 'mp4'}`,
+    durationMs: 5000,
+    width: 1,
+    height: 1,
+    alt: '',
+    cta: null,
+  });
+
+  it('shows an image story itself, and a video’s first frame', () => {
+    expect(cardStill(story('image'), false)?.getAttribute('src')).toBe('https://cdn.test/s.png');
+    const video = cardStill(story('video'), false) as HTMLVideoElement;
+    expect(video.tagName).toBe('VIDEO');
+    expect(video.getAttribute('src')).toBe('https://cdn.test/s.mp4#t=0.001');
+    expect(video.muted).toBe(true);
+    expect(video.getAttribute('preload')).toBe('metadata');
+  });
+
+  it('keeps the cover hidden behind the still, and shows it if the still can’t load', () => {
+    const group = {
+      id: 'g',
+      title: 'G',
+      coverUrl: 'https://cdn.test/cover.jpg',
+      updatedAt: '',
+      stories: [story('image')],
+    };
+    const state = { seen: false, reducedMotion: false, lowData: false, width: 112 };
+    const card = renderCard(group, look(), state);
+    const bg = card.querySelector('.card-bg')!;
+    expect(bg.classList.contains('has-still')).toBe(true);
+    card.querySelector('.still')!.dispatchEvent(new Event('error'));
+    expect(bg.classList.contains('has-still')).toBe(false);
+    expect(card.querySelector('.still')).toBeNull();
+    // No still at all (a video on low data): just the cover.
+    const lowData = renderCard({ ...group, stories: [story('video')] }, look(), {
+      ...state,
+      lowData: true,
+    });
+    expect(lowData.querySelector('.card-bg')!.classList.contains('has-still')).toBe(false);
+  });
+
+  it('leaves the cover on low data for videos, or with no stories', () => {
+    expect(cardStill(story('video'), true)).toBeNull();
+    expect(cardStill(undefined, false)).toBeNull();
   });
 });

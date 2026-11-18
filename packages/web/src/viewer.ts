@@ -1,3 +1,6 @@
+/** The Energized style ships with the viewer: bars that use it load this chunk at once. */
+export { EnergizedBar } from './energized.js';
+
 import {
   type AnswerResultsDto,
   type AnswerStore,
@@ -145,6 +148,18 @@ const browserScheduler: Scheduler = {
 function defaultNavigate(url: string, target: '_self' | '_blank') {
   if (target === '_blank') window.open(url, '_blank', 'noopener');
   else window.location.assign(url);
+}
+
+/**
+ * Sets a control's label and icon, redrawing the icon only when it changes. Controls render on
+ * every update (often while a video starts), and an icon swapped out between press and release
+ * would lose the click.
+ */
+function setButton(button: HTMLElement, label: string, name: keyof typeof ICONS) {
+  button.setAttribute('aria-label', label);
+  if (button.dataset.icon === name) return;
+  button.dataset.icon = name;
+  button.replaceChildren(icon(ICONS[name]));
 }
 
 /** Session-wide sound preference: once unmuted, later videos play with sound too. */
@@ -463,12 +478,10 @@ export class Viewer {
   private renderControls() {
     const { el } = this;
     const paused = this.pausedBy.has('user');
-    el.pause.setAttribute('aria-label', paused ? labels.play : labels.pause);
-    el.pause.replaceChildren(icon(paused ? ICONS.play : ICONS.pause));
+    setButton(el.pause, paused ? labels.play : labels.pause, paused ? 'play' : 'pause');
     const isVideo = this.story?.type === 'video';
     el.mute.hidden = !isVideo;
-    el.mute.setAttribute('aria-label', muted ? labels.unmute : labels.mute);
-    el.mute.replaceChildren(icon(muted ? ICONS.muted : ICONS.sound));
+    setButton(el.mute, muted ? labels.unmute : labels.mute, muted ? 'muted' : 'sound');
   }
 
   private renderProgress() {

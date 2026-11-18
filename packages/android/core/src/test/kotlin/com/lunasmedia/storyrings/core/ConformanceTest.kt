@@ -38,6 +38,7 @@ class ConformanceTest {
             assertTrue(same(c["viewableMs"], it))
         })
         assertTrue(same(c["tapMaxMs"], Gestures.TAP_MAX_MS))
+        assertTrue(same(c["energizedPreviewMs"], ENERGIZED_PREVIEW_MS))
         assertTrue(same(c["sessionTimeoutMs"], Sessions.TIMEOUT_MS))
         assertTrue(same(c["viewerIdMaxAgeMs"], Sessions.VIEWER_ID_MAX_AGE_MS))
         assertTrue(same(c["seenMaxIds"], SeenStore.MAX_IDS))
@@ -90,6 +91,7 @@ class ConformanceTest {
     @Test fun sessions() = run("sessions")
     @Test fun interactions() = run("interactions")
     @Test fun display() = run("display")
+    @Test fun energized() = run("energized")
 
     private fun run(suite: String) {
         val data = read(File(spec, "cases/$suite.json")).obj()
@@ -114,7 +116,29 @@ private val suites: Map<String, (Map<String, Any?>) -> Any?> = mapOf(
     "gestures" to ::gestures, "seen" to ::seen, "analytics" to ::analytics, "sessions" to ::sessions,
     "interactions" to ::interactions,
     "display" to { input -> StoryLook.fromJson(input["story"].obj()).json },
+    "energized" to ::energized,
 )
+
+// --- energized
+
+private fun energized(input: Map<String, Any?>): Any {
+    if (input["op"] == "isEnergized") return mapOf("energized" to BarLayout.resolve(input["layout"]).isEnergized)
+    // Seen stories make no difference: it's always the first.
+    fun groups(any: Any?) = any.list().map { g -> g.list().map { it as String } }
+    val cycle = EnergizedCycle(groups(input["groups"]))
+    val steps = input["steps"].list().map { raw ->
+        val step = raw.list()
+        when (step[0]) {
+            "visible" -> cycle.setVisible(step[1].list().map { it.int() })
+            "tick" -> cycle.tick(step[1].int())
+            "markSeen" -> Unit
+            "groups" -> cycle.setGroups(groups(step[1]))
+            else -> error("energized: unknown step ${step[0]}")
+        }
+        mapOf("current" to cycle.current?.json, "remainingMs" to cycle.remainingMs)
+    }
+    return mapOf("steps" to steps)
+}
 
 // --- interactions
 

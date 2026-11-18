@@ -46,6 +46,10 @@ export interface AudienceDto {
 export interface ReachDto {
   /** People with at least one story impression (MRC/IAB viewable). */
   viewers: number;
+  /** People with an impression of a story that has a poll, quiz or emoji slider. */
+  interactiveViewers: number;
+  /** Of those, people who answered one of those stories' polls, quizzes or sliders. */
+  responders: number;
 }
 
 export interface AnalyticsDto {

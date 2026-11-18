@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:stories_sdk/src/widgets/circle.dart';
+import 'package:stories_sdk/src/widgets/energized.dart';
+import 'package:stories_sdk/stories_core.dart' show energizedPreviewMs;
 import 'package:stories_sdk/stories_sdk.dart';
 
 Map<String, Object?> _story(String id, {String? title, Map<String, String>? cta}) => {
@@ -18,12 +21,13 @@ Map<String, Object?> _story(String id, {String? title, Map<String, String>? cta}
       'cta': cta,
     };
 
-Map<String, Object?> _feed({bool sharing = false, String? shareLink}) => {
+Map<String, Object?> _feed({bool sharing = false, String? shareLink, Map<String, Object?>? layout}) => {
       'app': {
         'id': 'app-1',
         'deepLinkSchemes': ['myshop'],
         'sharing': sharing,
         if (shareLink != null) 'shareLink': shareLink,
+        if (layout != null) 'layout': layout,
       },
       'bar': {'id': 'bar-1', 'key': 'main'},
       'groups': [
@@ -138,6 +142,40 @@ Future<void> _finish(WidgetTester tester, StoriesClient client) async {
 }
 
 void main() {
+  group('Energized style', () {
+    /// Which card previews which story now.
+    List<String> previews(WidgetTester tester) => [
+          for (final p in tester.widgetList<StoryPreview>(find.byType(StoryPreview)))
+            '${tester.widget<StoryCircle>(find.ancestor(of: find.byWidget(p), matching: find.byType(StoryCircle))).group.id}:${p.story.id}',
+        ];
+    const vertical = {'width': 72, 'height': 112, 'corner': 16, 'gap': 10, 'motion': 'energized'};
+
+    testWidgets('previews each fully visible card in turn, 7 seconds each', (tester) async {
+      final api = _Api(_feed(layout: vertical));
+      final client = _start(api);
+      await _pumpBar(tester, client);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(previews(tester), ['g1:s1']);
+      await tester.pump(const Duration(milliseconds: energizedPreviewMs));
+      await tester.pump();
+      expect(previews(tester), ['g2:s3']);
+      await tester.pump(const Duration(milliseconds: energizedPreviewMs));
+      await tester.pump();
+      expect(previews(tester), ['g1:s1']);
+      // Previews aren't story views.
+      await _finish(tester, client);
+      expect(api.eventTypes, isNot(contains('story_view')));
+    });
+
+    testWidgets('does nothing on cards that aren\'t vertical', (tester) async {
+      final api = _Api(_feed(layout: {...vertical, 'height': 72}));
+      final client = _start(api);
+      await _pumpBar(tester, client);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(previews(tester), isEmpty);
+      await _finish(tester, client);
+    });
+  });
   testWidgets('shows a circle per group, labelled for screen readers', (tester) async {
     final api = _Api(_feed());
     final client = _start(api);

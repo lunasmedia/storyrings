@@ -104,8 +104,14 @@ export function renderCircle(
     loading: 'lazy',
     draggable: 'false',
   });
-  const media = h('span', { class: 'img' }, img);
-  if (cover.animated && cover.video && !state.reducedMotion && !state.lowData) {
+  const animatedCover = cover.animated && cover.video && !state.reducedMotion && !state.lowData;
+  // What it shows, so a re-render can keep it (already loaded and playing) instead of a new one.
+  const media = h(
+    'span',
+    { class: 'img', 'data-media': `circle ${cover.image} ${animatedCover ? cover.video : ''}` },
+    img,
+  );
+  if (animatedCover && cover.video) {
     const video = h('video', {
       class: 'cover anim',
       muted: true,
@@ -168,4 +174,98 @@ export function environment(): Pick<CircleState, 'reducedMotion' | 'lowData'> {
     .connection;
   const lowData = !!conn && (conn.saveData === true || /(^|-)2g$/.test(conn.effectiveType ?? ''));
   return { reducedMotion, lowData };
+}
+
+/** Energized cards: the circle in the middle is this share of the card's width. */
+export const ENERGIZED_AVATAR = 0.5;
+
+/**
+ * An Energized style card: a story-shaped card showing a still of the group's first story (which
+ * plays on its turn; the cover until the still loads), the group's circle in the middle (ring,
+ * animation, seen colour and badge as usual) and the title inside the card at the bottom.
+ */
+export function renderCard(
+  group: FeedGroupDto,
+  appearance: Appearance,
+  state: CircleState & { width: number },
+): HTMLElement {
+  const size = Math.round(state.width * ENERGIZED_AVATAR);
+  const circle = renderCircle(
+    group,
+    { ...appearance, title: { ...appearance.title, hidden: true } },
+    state,
+  );
+  circle.classList.add('avatar');
+  circle.setAttribute(
+    'style',
+    `${circle.getAttribute('style')};--s-size:${size}px;--s-h:${size}px;--s-r:${size / 2}px`,
+  );
+  const cover = group.cover ?? { image: group.coverUrl, animated: false };
+  const still = group.stories[0];
+  const stillEl = cardStill(still, state.lowData);
+  const bg = h(
+    'span',
+    {
+      // With a still, the cover stays hidden behind it (it only shows if the still can't load),
+      // so it never flashes before the still.
+      class: `card-bg${stillEl ? ' has-still' : ''}`,
+      // What it shows, so a re-render can keep it (already loaded) instead of a new one.
+      'data-media': `card ${cover.image} ${still ? `${still.type} ${still.url}` : ''} ${state.lowData}`,
+    },
+    h('img', {
+      class: 'cover',
+      src: cover.image,
+      alt: '',
+      loading: 'lazy',
+      draggable: 'false',
+    }),
+    stillEl,
+  );
+  stillEl?.addEventListener('error', () => {
+    bg.classList.remove('has-still');
+    stillEl.remove();
+  });
+  return h(
+    'span',
+    { class: `card${state.seen ? ' seen' : ''}`, style: circleVars(appearance) },
+    bg,
+    h('span', { class: 'scrim', 'aria-hidden': 'true' }),
+    circle,
+    !appearance.title.hidden && h('span', { class: 'title', 'aria-hidden': 'true' }, group.title),
+  );
+}
+
+/**
+ * An Energized card's still: its first story (the one it previews) as an image, or a video's
+ * first frame (not on low data: that fetches the start of the video). Shows at once when the
+ * image is already loaded (the bar preloads them), otherwise fades in when it is. If it can't
+ * load it fires `error`, and the card shows the cover instead.
+ */
+export function cardStill(
+  story: FeedGroupDto['stories'][number] | undefined,
+  lowData: boolean,
+): HTMLElement | null {
+  if (!story || (story.type === 'video' && lowData)) return null;
+  if (story.type === 'video') {
+    const video = h('video', {
+      class: 'cover still',
+      muted: true,
+      playsinline: true,
+      preload: 'metadata',
+      disablepictureinpicture: true,
+      'aria-hidden': 'true',
+    });
+    video.muted = true;
+    video.playsInline = true;
+    video.addEventListener('loadeddata', () => video.classList.add('on'), { once: true });
+    // A moment in, so browsers that only draw a frame once seeked (iOS Safari) show one.
+    video.src = `${story.url}#t=0.001`;
+    return video;
+  }
+  const img = h('img', { class: 'cover still', alt: '', draggable: 'false' });
+  img.addEventListener('load', () => img.classList.add('on'), { once: true });
+  img.src = story.url;
+  // Already in memory (preloaded with the feed): shown straight away, with no fade.
+  if (img.complete && img.naturalWidth) img.classList.add('on');
+  return img;
 }

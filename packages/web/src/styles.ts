@@ -28,6 +28,10 @@ export const srOnly =
 
 // Ring animations only change transform/opacity, so they run on the compositor without repainting.
 // Animated layers are clipped to the ring band (any shape), so they never cover the image.
+// Energized style: story-filled cards (a still of the first story over the cover) with the
+// group's circle in the middle (renderCard). The
+// background is its own stacking context, so a playing preview stays under the scrim, circle and
+// title, which follow it.
 export const BAR_CSS = `
 :host{display:block}
 .bar{padding:var(--s-pad);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
@@ -60,8 +64,14 @@ video.cover{opacity:0;transition:opacity .2s}
 .shine::after{content:"";position:absolute;top:0;bottom:0;left:0;width:55%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.85) 50%,transparent);animation:c-shimmer var(--c-speed) cubic-bezier(.45,.05,.55,.95) infinite;will-change:transform}
 .pending,.skeleton{visibility:hidden}.skeleton .title{height:var(--s-title-size)}
 .sr{${srOnly}}
+.card{position:relative;display:block;width:var(--s-size);height:var(--s-h);border-radius:var(--s-r);overflow:hidden;background:#222}
+.card-bg{position:absolute;inset:0;z-index:0}
+.card .still{opacity:0;transition:opacity .2s}.card .still.on{opacity:1}.has-still>.cover:not(.still){visibility:hidden}
+.scrim{position:absolute;inset:55% 0 0;background:linear-gradient(transparent,#0009)}
+.card .avatar{position:absolute;inset:50% auto auto 50%;width:auto;translate:-50% -50%}
+.card .title{position:absolute;inset:auto 6px 8px;color:#fff;text-shadow:0 1px 3px #0009}
 @keyframes c-spin{to{transform:rotate(1turn)}}
 @keyframes c-pulse{0%{transform:scale(1);opacity:.75}100%{transform:scale(1.3);opacity:0}}
 @keyframes c-shimmer{0%{transform:translateX(-110%)}60%,100%{transform:translateX(200%)}}
-@media (prefers-reduced-motion:reduce){.ring,.ring::after,.spin::before,.shine::after{animation:none!important;transition:none}.shine{display:none}video.cover{display:none}}
+@media (prefers-reduced-motion:reduce){.ring,.ring::after,.spin::before,.shine::after{animation:none!important;transition:none}.shine{display:none}video.cover{display:none}.card video.still{display:block}}
 `;

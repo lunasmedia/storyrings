@@ -159,6 +159,20 @@ export interface StoryDto {
   updatedAt: string;
 }
 
+/**
+ * Copies a group, with its stories and media, into another app or website of the same
+ * workspace. The copy arrives switched off ("draft"), so it can be checked before it goes live.
+ */
+export const copyGroupInput = z.object({ appId: id }).strict();
+export type CopyGroupInput = z.infer<typeof copyGroupInput>;
+
+export interface CopyGroupResultDto {
+  /** The new group, in the other app or website. */
+  group: GroupDto;
+  /** Things to check before switching it on (e.g. links the other app can't open). */
+  notes: string[];
+}
+
 export interface GroupDto {
   id: string;
   appId: string;

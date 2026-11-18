@@ -3,6 +3,7 @@ import {
   type AnswerStore,
   type FeedDto,
   type FeedGroupDto,
+  isEnergized,
   labels,
   parseShareLink,
   resolveTheme,
@@ -12,9 +13,10 @@ import {
   type TrackedEvent,
   withoutShareLink,
 } from '@stories/core';
-import { badgeSpeech, environment, renderCircle, themeAppearance } from './circle.js';
+import { badgeSpeech, environment, renderCard, renderCircle, themeAppearance } from './circle.js';
 import type { StoriesClient } from './client.js';
 import { h } from './dom.js';
+import type { EnergizedBar } from './energized.js';
 import { loadedViewer, loadViewer } from './load-viewer.js';
 import { BAR_CSS, themeVars } from './styles.js';
 import type { CircleRect, StoriesTransition, Viewer, ViewerCallbacks } from './viewer.js';
@@ -89,6 +91,11 @@ export class StoryBar implements StoriesBarHandle {
   private faded = false;
   private revealTimer: ReturnType<typeof setTimeout> | undefined;
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * Energized style: stories preview in the cards (vertical cards only). Its code comes with
+   * the viewer's, loaded as soon as a bar uses it.
+   */
+  private energized: EnergizedBar | null = null;
   private readonly bar: string;
   private tags: string[];
 
@@ -222,6 +229,7 @@ export class StoryBar implements StoriesBarHandle {
     const viewerModule = loadedViewer();
     if (!this.feed || !this.seen || !viewerModule || index >= this.groups.length) return;
     this.viewer?.close();
+    this.energized?.hold(true);
     this.viewer = new viewerModule.Viewer({
       feed: this.feed,
       groupIndex: index,
@@ -239,6 +247,7 @@ export class StoryBar implements StoriesBarHandle {
       onShare: (e) => this.options.onShare?.(e),
       onClose: (reason) => {
         this.viewer = null;
+        this.energized?.hold(false);
         if (!this.destroyed) {
           // Re-render for the updated "seen" rings, then return focus to the circle that opened it.
           this.render();
@@ -274,6 +283,7 @@ export class StoryBar implements StoriesBarHandle {
     if (this.countdownTimer) clearInterval(this.countdownTimer);
     this.viewer?.close();
     this.stopImpressions();
+    this.energized?.stop();
     this.container.remove();
     this.onDestroy();
   }
@@ -304,7 +314,7 @@ export class StoryBar implements StoriesBarHandle {
       // Redraw only if something changed since the remembered feed, and only once
       // the new covers are loaded, so they don't pop in after the circles.
       const same = JSON.stringify(feed) === JSON.stringify(this.feed);
-      if (!same) await preloadCovers(feed.groups);
+      if (!same) await preloadCovers(feed.groups, isEnergized(feed.app.layout));
       if (this.destroyed) return;
       this.feed = feed;
       this.seen = seen;
@@ -312,6 +322,10 @@ export class StoryBar implements StoriesBarHandle {
       this.fresh = true;
       if (same) this.observeImpressions(this.wrapper.firstElementChild as HTMLElement);
       else this.render();
+      // Energized cards: video stills show their first frame before the bar appears, if it
+      // comes quickly (it's still hidden, holding its space).
+      await stillsReady(this.wrapper);
+      if (this.destroyed) return;
       this.reveal();
       this.options.onLoad?.(feed.groups);
       this.openSharedLink();
@@ -372,6 +386,9 @@ export class StoryBar implements StoriesBarHandle {
     const theme = resolveTheme(this.options.theme);
     const fallback = themeAppearance(theme);
     const env = environment();
+    // Energized style: story-filled cards with the circle in the middle.
+    const layout = this.feed?.app.layout;
+    const energized = isEnergized(layout);
 
     const items = groups.map((g, i) => {
       const isSeen = !!seen?.isGroupSeen(g);
@@ -385,7 +402,13 @@ export class StoryBar implements StoriesBarHandle {
           'aria-label':
             labels.openGroup(g.title, g.stories.length, isSeen) + badgeSpeech(appearance, g.endsAt),
         },
-        renderCircle(g, appearance, { seen: isSeen, ...env }),
+        energized
+          ? renderCard(g, appearance, {
+              seen: isSeen,
+              ...env,
+              width: layout!.width,
+            })
+          : renderCircle(g, appearance, { seen: isSeen, ...env }),
       );
       // detail > 0: a real mouse/touch click (keyboard activation reports 0).
       button.addEventListener('click', (e) => this.openGroup(i, e.detail > 0));
@@ -397,10 +420,29 @@ export class StoryBar implements StoriesBarHandle {
     });
 
     const list = h('ul', { class: 'list', role: 'list', 'aria-label': labels.bar }, ...items);
+    // Re-rendering (the viewer closed: rings turn grey) keeps the pictures already showing, so
+    // nothing fades in again or flashes, and keeps the bar where it was scrolled.
+    keepMedia(this.wrapper, items);
+    const scrolled = this.wrapper.scrollLeft;
     this.wrapper.replaceChildren(list);
+    this.wrapper.scrollLeft = scrolled;
     // Impressions only count groups from the live feed, not the remembered one.
     if (this.fresh) this.observeImpressions(list);
     this.scheduleCountdown();
+    // Energized style: previews start again on the new cards (not with reduced motion or
+    // Save-Data: they play video).
+    if (energized && !env.reducedMotion && !env.lowData) {
+      void loadViewer().then(
+        (m) => {
+          // Re-rendered or destroyed meanwhile: the newer render starts it.
+          if (this.destroyed || !list.isConnected) return;
+          this.energized ??= new m.EnergizedBar();
+          this.energized.start(list, groups);
+          if (this.viewer) this.energized.hold(true);
+        },
+        () => {},
+      );
+    } else this.energized?.stop();
   }
 
   /** Countdown badges change at most once a minute; re-render only when their text changes. */
@@ -505,12 +547,59 @@ function preloadFirstStories(groups: readonly FeedGroupDto[], seen: SeenStore): 
   });
 }
 
-/** Loads and decodes the first covers, giving up after a moment on a slow network. */
-function preloadCovers(groups: readonly FeedGroupDto[]): Promise<unknown> {
-  const covers = groups.slice(0, 8).map((g) => {
+/**
+ * Loads and decodes the first covers (and Energized cards' image stills: their first story),
+ * giving up after a moment on a slow network.
+ */
+function preloadCovers(groups: readonly FeedGroupDto[], stills: boolean): Promise<unknown> {
+  const urls = groups.slice(0, 8).flatMap((g) => {
+    const first = g.stories[0];
+    return [
+      g.cover?.image ?? g.coverUrl,
+      ...(stills && first?.type === 'image' ? [first.url] : []),
+    ];
+  });
+  const images = urls.map((url) => {
     const img = new Image();
-    img.src = g.cover?.image ?? g.coverUrl;
+    img.src = url;
     return img.decode?.().catch(() => {});
   });
-  return Promise.race([Promise.all(covers), new Promise((r) => setTimeout(r, REVEAL_WAIT_MS))]);
+  return Promise.race([Promise.all(images), new Promise((r) => setTimeout(r, REVEAL_WAIT_MS))]);
+}
+
+/** Waits (a moment at most) for the bar's video stills to have their first frame. */
+function stillsReady(root: Element): Promise<unknown> {
+  const videos = [...root.querySelectorAll<HTMLVideoElement>('video.still')].filter(
+    (v) => !v.classList.contains('on'),
+  );
+  if (!videos.length) return Promise.resolve();
+  const frames = videos.map(
+    (v) =>
+      new Promise<void>((resolve) => {
+        v.addEventListener('loadeddata', () => resolve(), { once: true });
+        v.addEventListener('error', () => resolve(), { once: true });
+      }),
+  );
+  return Promise.race([Promise.all(frames), new Promise((r) => setTimeout(r, REVEAL_WAIT_MS))]);
+}
+
+/**
+ * Moves the pictures already drawn in `from` (covers, animated covers, Energized stills) into
+ * the new `items` wherever a group still shows the same thing, so a re-render doesn't load
+ * them again. Story previews playing in them are left behind (they start again on their turn).
+ */
+function keepMedia(from: Element, items: readonly HTMLElement[]) {
+  const key = (el: Element) =>
+    `${el.closest('li')?.dataset.group}\n${(el as HTMLElement).dataset.media}`;
+  const old = new Map<string, Element>();
+  for (const el of from.querySelectorAll('[data-media]')) old.set(key(el), el);
+  if (!old.size) return;
+  for (const li of items) {
+    for (const el of li.querySelectorAll('[data-media]')) {
+      const kept = old.get(key(el));
+      if (!kept) continue;
+      for (const ep of kept.querySelectorAll('.ep')) ep.remove();
+      el.replaceWith(kept);
+    }
+  }
 }

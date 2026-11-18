@@ -129,3 +129,38 @@ export function visibleItems(
   }
   return out;
 }
+
+/** Indexes of items entirely on screen (Energized style previews only play in those). */
+export function fullyVisibleItems(
+  count: number,
+  m: Pick<BarMetrics, 'width' | 'gap' | 'padding'>,
+  offset: number,
+  viewport: number,
+): number[] {
+  const out: number[] = [];
+  const item = m.width + 12;
+  for (let i = 0; i < count; i++) {
+    const start = m.padding + i * (item + m.gap) - offset;
+    // Half a point of slack for rounding in scroll offsets.
+    if (start >= -0.5 && start + item <= viewport + 0.5) out.push(i);
+  }
+  return out;
+}
+
+/**
+ * The scroll offset that shows all of item `index` with the least scrolling from `offset`, or
+ * null when it's already fully on screen (Energized style: each card scrolls into view for its
+ * turn).
+ */
+export function offsetToShow(
+  index: number,
+  m: Pick<BarMetrics, 'width' | 'gap' | 'padding'>,
+  offset: number,
+  viewport: number,
+): number | null {
+  const item = m.width + 12;
+  const start = m.padding + index * (item + m.gap);
+  if (start < offset - 0.5) return start;
+  if (start + item > offset + viewport + 0.5) return start + item - viewport;
+  return null;
+}

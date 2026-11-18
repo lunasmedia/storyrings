@@ -12,7 +12,7 @@ import {
   SPEED_MS,
   titleColor,
 } from './layout';
-import { Video } from './optional';
+import { TEXTURE_VIEW, Video } from './optional';
 
 export interface CircleProps {
   group: FeedGroupDto;
@@ -267,6 +267,9 @@ function AnimatedCover({ uri }: { uri: string }) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Video
+        // Android: a TextureView, which moves and fades with the views around it (a SurfaceView
+        // showed black while the viewer slid in, and lagged behind animations and scrolling).
+        viewType={TEXTURE_VIEW}
         source={{ uri }}
         muted
         repeat

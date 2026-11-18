@@ -14,6 +14,8 @@ export let Video: ComponentType<any> | null = null;
 try {
   Video = require('react-native-video').default ?? null;
 } catch {}
+/** react-native-video's ViewType.TEXTURE (Android; iOS ignores it). */
+export const TEXTURE_VIEW = 0;
 
 let asyncStorage: KeyValueStorage | null = null;
 try {

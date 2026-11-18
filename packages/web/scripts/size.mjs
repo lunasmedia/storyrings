@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
 // stories.js loads with the page; stories-viewer.js only when a visitor goes to open a story.
-const BUDGETS = { 'stories.js': 12, 'stories-viewer.js': 16 };
+// stories.js went from 12 to 13 KB with the Energized card stills (0.1.3).
+const BUDGETS = { 'stories.js': 13, 'stories-viewer.js': 16 };
 let over = false;
 for (const [name, kb] of Object.entries(BUDGETS)) {
   const gz = gzipSync(readFileSync(new URL(`../dist/${name}`, import.meta.url))).length;
